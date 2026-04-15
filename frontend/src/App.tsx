@@ -294,6 +294,7 @@ export default function App() {
             scanResult={scanResult}
             drawMode={drawMode}
             darkMode={darkMode}
+            displayUnit={displayUnit}
             onShapeChange={handleShapeChange}
           />
 

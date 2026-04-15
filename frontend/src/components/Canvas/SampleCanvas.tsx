@@ -23,7 +23,7 @@ import {
   umToPixel,
   zoomViewport,
 } from '../../utils/geometry'
-import { fmtUm } from '../../utils/units'
+import { type DisplayUnit, fmtDisplay } from '../../utils/units'
 
 // Pass colours for multi-pass scans
 const PASS_COLORS = ['#3b82f6', '#f97316', '#22c55e', '#a855f7', '#ef4444', '#06b6d4']
@@ -33,12 +33,13 @@ interface Props {
   scanResult: ScanResult | null
   drawMode: DrawMode
   darkMode: boolean
+  displayUnit: DisplayUnit
   onShapeChange: (shape: SampleShape) => void
 }
 
 // ── Grid lines helper ──────────────────────────────────────────────────────────
 
-function CoordGrid({ vp, width, height, darkMode }: { vp: Viewport; width: number; height: number; darkMode: boolean }) {
+function CoordGrid({ vp, width, height, darkMode, displayUnit }: { vp: Viewport; width: number; height: number; darkMode: boolean; displayUnit: DisplayUnit }) {
   const gridColor = darkMode ? '#2e2e2e' : '#e5e7eb'
   const labelColor = darkMode ? '#555' : '#9ca3af'
 
@@ -62,7 +63,7 @@ function CoordGrid({ vp, width, height, darkMode }: { vp: Viewport; width: numbe
         key={`tx${x}`}
         x={px + 2}
         y={4}
-        text={fmtUm(x, 0)}
+        text={fmtDisplay(x, displayUnit, 0)}
         fontSize={9}
         fill={labelColor}
         listening={false}
@@ -79,7 +80,7 @@ function CoordGrid({ vp, width, height, darkMode }: { vp: Viewport; width: numbe
         key={`ty${y}`}
         x={4}
         y={py + 2}
-        text={fmtUm(y, 0)}
+        text={fmtDisplay(y, displayUnit, 0)}
         fontSize={9}
         fill={labelColor}
         listening={false}
@@ -401,6 +402,7 @@ export default function SampleCanvas({
   scanResult,
   drawMode,
   darkMode,
+  displayUnit,
   onShapeChange,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -591,7 +593,7 @@ export default function SampleCanvas({
       >
         {/* Background + coordinate grid (not transformed — drawn in pixel space) */}
         <Layer listening={false}>
-          <CoordGrid vp={vp} width={size.w} height={size.h} darkMode={darkMode} />
+          <CoordGrid vp={vp} width={size.w} height={size.h} darkMode={darkMode} displayUnit={displayUnit} />
           {/* Axes */}
           <Line
             points={[toX(0), 0, toX(0), size.h]}
