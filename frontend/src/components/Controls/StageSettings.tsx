@@ -94,7 +94,7 @@ export default function StageSettings({ constraints, displayUnit, onChange }: Pr
       </div>
 
       <div className="flex flex-col gap-0.5">
-        <Tooltip text="Acquisition time per spectrum point — used to estimate total scan duration" side="right">
+        <Tooltip text="Acquisition time per spectrum point. Used to estimate total scan duration." side="right">
           <span className={LABEL_CLS + ' cursor-default border-b border-dashed border-gray-400 dark:border-[#444]'}>Time per point</span>
         </Tooltip>
         <div className="flex items-center gap-1">

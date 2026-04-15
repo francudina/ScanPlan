@@ -241,7 +241,7 @@ export default function ShapeControls({
           <Tooltip text="Radius of the circle" side="right">
             <div className={ROW_CLS + ' w-full'}>
               <span className="text-[10px] font-mono font-semibold text-gray-400 dark:text-[#555] w-12 shrink-0">Radius</span>
-              <NumericInput value={umToDisplay(shape.circle.radius, displayUnit)} onChange={(v) => updateCircle({ radius: Math.max(0.001, displayToUm(v, displayUnit)) })} step={opts.step} className={INPUT_CLS} />
+              <NumericInput value={umToDisplay(shape.circle.radius, displayUnit)} onChange={(v) => updateCircle({ radius: Math.max(0.001, displayToUm(v, displayUnit)) })} step={opts.step} className={INPUT_CLS + ' w-20'} />
               <span className={AXIS_CLS + ' w-6 text-right'}>{displayUnit}</span>
             </div>
           </Tooltip>

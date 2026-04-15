@@ -99,7 +99,7 @@ export default function ScanParamsForm({ params, displayUnit, onChange }: Props)
 
       {/* Overlap */}
       <div className="flex flex-col gap-1">
-        <Tooltip text="Fraction of step size that adjacent points overlap — 0% = no overlap, 50% = half-step overlap" side="right">
+        <Tooltip text="Fraction of step size that adjacent points overlap. 0% = no overlap, 50% = half-step overlap" side="right">
           <span className={LABEL_CLS + ' border-b border-dashed border-gray-400 dark:border-[#444]'}>Overlap</span>
         </Tooltip>
         <div className="flex items-center gap-2">
