@@ -46,7 +46,7 @@ function StageField({
   return (
     <div className="flex flex-col gap-0.5">
       <Tooltip text={hint} side="right">
-        <span className={LABEL_CLS + ' cursor-default border-b border-dashed border-gray-200 dark:border-[#444]'}>{label}</span>
+        <span className={LABEL_CLS + ' cursor-default border-b border-dashed border-gray-400 dark:border-[#444]'}>{label}</span>
       </Tooltip>
       <div className="flex items-center gap-1">
         <input
@@ -76,30 +76,31 @@ export default function StageSettings({ constraints, displayUnit, onChange }: Pr
 
   return (
     <section className="space-y-3">
-      <StageField
-        label="Max scan width"
-        hint="Maximum horizontal scan range of the DXR3 stage"
-        valueUm={constraints.max_scan_width}
-        onChangeUm={(v) => set({ max_scan_width: v })}
-        displayUnit={displayUnit}
-      />
-
-      <StageField
-        label="Max scan height"
-        hint="Maximum vertical scan range of the DXR3 stage"
-        valueUm={constraints.max_scan_height}
-        onChangeUm={(v) => set({ max_scan_height: v })}
-        displayUnit={displayUnit}
-      />
+      <div className="grid grid-cols-2 gap-2">
+        <StageField
+          label="Max width"
+          hint="Maximum horizontal scan range of the DXR3 stage"
+          valueUm={constraints.max_scan_width}
+          onChangeUm={(v) => set({ max_scan_width: v })}
+          displayUnit={displayUnit}
+        />
+        <StageField
+          label="Max height"
+          hint="Maximum vertical scan range of the DXR3 stage"
+          valueUm={constraints.max_scan_height}
+          onChangeUm={(v) => set({ max_scan_height: v })}
+          displayUnit={displayUnit}
+        />
+      </div>
 
       <div className="flex flex-col gap-0.5">
         <Tooltip text="Acquisition time per spectrum point — used to estimate total scan duration" side="right">
-          <span className={LABEL_CLS + ' cursor-default border-b border-dashed border-gray-200 dark:border-[#444]'}>Time per point</span>
+          <span className={LABEL_CLS + ' cursor-default border-b border-dashed border-gray-400 dark:border-[#444]'}>Time per point</span>
         </Tooltip>
         <div className="flex items-center gap-1">
           <input
             type="number"
-            className={INPUT_CLS}
+            className={INPUT_CLS + ' w-20'}
             value={constraints.time_per_point_seconds}
             min={0.1}
             step={0.5}
@@ -107,27 +108,33 @@ export default function StageSettings({ constraints, displayUnit, onChange }: Pr
               set({ time_per_point_seconds: parseFloat(e.target.value) || 1 })
             }
           />
-          <span className="text-[10px] text-gray-400 dark:text-[#555] shrink-0 w-7 text-right">s</span>
+          <span className="text-[10px] text-gray-400 dark:text-[#555] shrink-0">sec</span>
         </div>
       </div>
 
       {/* DXR3 presets */}
-      <div>
-        <span className={LABEL_CLS + ' block mb-1.5'}>DXR3 Presets</span>
-        <div className="flex gap-1 flex-wrap">
+      <div className="flex flex-col gap-0.5">
+        <span className={LABEL_CLS}>DXR3 Presets</span>
+        <select
+          className="w-full bg-white border border-gray-200 rounded px-2 py-1 text-xs text-gray-700 font-mono cursor-pointer
+            focus:outline-none focus:border-blue-400 transition-colors
+            dark:bg-[#2c2c2c] dark:border-[#3a3a3a] dark:text-[#d4d4d4] dark:focus:border-[#4a9eff]"
+          value=""
+          onChange={(e) => {
+            const [w, h] = e.target.value.split(',').map(Number)
+            if (!isNaN(w)) set({ max_scan_width: w, max_scan_height: h })
+          }}
+        >
+          <option value="" disabled>Select stage size…</option>
           {[
             { wUm: mmToUm(25), hUm: mmToUm(25) },
             { wUm: mmToUm(50), hUm: mmToUm(50) },
           ].map(({ wUm, hUm }) => (
-            <button
-              key={wUm}
-              onClick={() => set({ max_scan_width: wUm, max_scan_height: hUm })}
-              className="px-2 py-0.5 text-[10px] font-mono rounded border transition-colors border-gray-200 text-gray-500 bg-white hover:border-blue-400 hover:text-blue-600 dark:border-[#3a3a3a] dark:text-[#888] dark:bg-[#2c2c2c] dark:hover:bg-[#333] dark:hover:border-[#4a9eff] dark:hover:text-[#4a9eff]"
-            >
-              {fmtDisplay(wUm, displayUnit, 0)} × {fmtDisplay(hUm, displayUnit, 0)}
-            </button>
+            <option key={wUm} value={`${wUm},${hUm}`}>
+              {fmtDisplay(wUm, displayUnit, 0)} × {fmtDisplay(hUm, displayUnit, 0)} {displayUnit}
+            </option>
           ))}
-        </div>
+        </select>
       </div>
     </section>
   )
