@@ -9,11 +9,15 @@ interface Props {
 
 const GAP = 8 // px between cursor and tooltip edge
 
+// Don't show tooltips on touch-only devices (no hover capability)
+const supportsHover = window.matchMedia('(hover: hover)').matches
+
 export default function Tooltip({ text, children }: Props) {
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
   const anchorRef = useRef<HTMLSpanElement>(null)
 
   const handleMouseMove = (e: React.MouseEvent) => {
+    if (!supportsHover) return
     setPos({ x: e.clientX, y: e.clientY })
   }
 

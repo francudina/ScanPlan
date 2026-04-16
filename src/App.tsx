@@ -120,6 +120,27 @@ export default function App() {
     return () => mq.removeEventListener('change', handler)
   }, [])
 
+  // Swipe from left edge to open sidebar on mobile
+  useEffect(() => {
+    let startX = 0
+    let startY = 0
+    const onTouchStart = (e: TouchEvent) => {
+      startX = e.touches[0].clientX
+      startY = e.touches[0].clientY
+    }
+    const onTouchEnd = (e: TouchEvent) => {
+      const dx = e.changedTouches[0].clientX - startX
+      const dy = Math.abs(e.changedTouches[0].clientY - startY)
+      if (startX < 24 && dx > 60 && dy < 100) setLeftOpen(true)
+    }
+    document.addEventListener('touchstart', onTouchStart, { passive: true })
+    document.addEventListener('touchend', onTouchEnd, { passive: true })
+    return () => {
+      document.removeEventListener('touchstart', onTouchStart)
+      document.removeEventListener('touchend', onTouchEnd)
+    }
+  }, [])
+
   const handleShapeChange = useCallback((s: SampleShape) => {
     setShape(s)
     setScanResult(null)

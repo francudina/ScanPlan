@@ -5,7 +5,6 @@ import {
   DISPLAY_UNIT_OPTIONS,
   displayToUm,
   fmtDisplay,
-  inputMinW,
   umToDisplay,
 } from '../../utils/units'
 import Tooltip from '../UI/Tooltip'
@@ -71,34 +70,32 @@ const PRESETS_UM = [1, 5, 10, 25, 50, 100, 500, 1000]
 export default function ScanParamsForm({ params, displayUnit, onChange }: Props) {
   const set = (patch: Partial<ScanParameters>) => onChange({ ...params, ...patch })
   const opts = DISPLAY_UNIT_OPTIONS.find((o) => o.value === displayUnit)!
-  const stacked = displayUnit === 'nm' || displayUnit === 'µm'
-  const minW = inputMinW(displayUnit)
-  const dblRow = stacked
-    ? 'flex flex-col items-start gap-0.5 w-full rounded px-1 py-0.5 transition-colors border border-transparent hover:bg-gray-50 dark:hover:bg-[#252525]'
-    : `${ROW_CLS} w-full`
 
   return (
     <section className="space-y-3">
-      {/* Offset row */}
+      {/* Offset rows — X and Y each on their own line */}
       <Tooltip text="Distance between adjacent scan points (ΔX horizontal, ΔY vertical)" side="right">
-        <div className={dblRow}>
-          <span className={`text-[10px] font-mono font-semibold text-gray-400 dark:text-[#555]${stacked ? '' : ' w-12 shrink-0'}`}>Offset</span>
-          <div className={`flex items-center gap-1${stacked ? ' w-full' : ' flex-1'}`}>
-            <span className={AXIS_CLS}>X</span>
+        <div className="space-y-0.5">
+          <span className={LABEL_CLS}>Offset</span>
+          <div className={ROW_CLS + ' w-full'}>
+            <span className={AXIS_CLS + ' w-4 shrink-0'}>X</span>
             <NumericInput
               value={umToDisplay(params.step_x, displayUnit)}
               onChange={(v) => set({ step_x: Math.max(0.001, displayToUm(v, displayUnit)) })}
               step={opts.step}
-              className={`${INPUT_CLS} ${minW}`}
+              className={INPUT_CLS + ' flex-1'}
             />
-            <span className={AXIS_CLS}>Y</span>
+            <span className={AXIS_CLS + ' w-10 text-right shrink-0'}>{displayUnit}</span>
+          </div>
+          <div className={ROW_CLS + ' w-full'}>
+            <span className={AXIS_CLS + ' w-4 shrink-0'}>Y</span>
             <NumericInput
               value={umToDisplay(params.step_y, displayUnit)}
               onChange={(v) => set({ step_y: Math.max(0.001, displayToUm(v, displayUnit)) })}
               step={opts.step}
-              className={`${INPUT_CLS} ${minW}`}
+              className={INPUT_CLS + ' flex-1'}
             />
-            <span className={AXIS_CLS + ' w-6 text-right'}>{displayUnit}</span>
+            <span className={AXIS_CLS + ' w-10 text-right shrink-0'}>{displayUnit}</span>
           </div>
         </div>
       </Tooltip>

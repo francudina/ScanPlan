@@ -10,7 +10,6 @@ import {
   type DisplayUnit,
   DISPLAY_UNIT_OPTIONS,
   displayToUm,
-  inputMinW,
   mmToUm,
   umToDisplay,
 } from '../../utils/units'
@@ -102,11 +101,6 @@ export default function ShapeControls({
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
 
   const opts = DISPLAY_UNIT_OPTIONS.find((o) => o.value === displayUnit)!
-  const stacked = displayUnit === 'nm' || displayUnit === 'µm'
-  const minW = inputMinW(displayUnit)
-  const dblRow = stacked
-    ? 'flex flex-col items-start gap-0.5 w-full rounded px-1 py-0.5 transition-colors border border-transparent hover:bg-gray-50 dark:hover:bg-[#252525]'
-    : `${ROW_CLS} w-full`
 
   const setShapeType = (type: ShapeType) => {
     if (type === 'rectangle') {
@@ -205,27 +199,33 @@ export default function ShapeControls({
           <p className={LABEL_CLS + ' mb-1'}>Dimensions</p>
 
           <Tooltip text="Top-left corner X and Y coordinates of the rectangle" side="right">
-            <div className={dblRow}>
-              <span className={`text-[10px] font-mono font-semibold text-gray-400 dark:text-[#555]${stacked ? '' : ' w-12 shrink-0'}`}>Origin</span>
-              <div className={`flex items-center gap-1${stacked ? ' w-full' : ' flex-1'}`}>
-                <span className={AXIS_CLS}>X</span>
-                <NumericInput value={umToDisplay(shape.rect.x, displayUnit)} onChange={(v) => updateRect({ x: displayToUm(v, displayUnit) })} step={opts.step} className={`${INPUT_CLS} ${minW}`} />
-                <span className={AXIS_CLS}>Y</span>
-                <NumericInput value={umToDisplay(shape.rect.y, displayUnit)} onChange={(v) => updateRect({ y: displayToUm(v, displayUnit) })} step={opts.step} className={`${INPUT_CLS} ${minW}`} />
-                <span className={AXIS_CLS + ' w-6 text-right'}>{displayUnit}</span>
+            <div className="space-y-0.5 w-full">
+              <span className="text-[10px] font-mono font-semibold text-gray-400 dark:text-[#555]">Origin</span>
+              <div className={ROW_CLS + ' w-full'}>
+                <span className={AXIS_CLS + ' w-4 shrink-0'}>X</span>
+                <NumericInput value={umToDisplay(shape.rect.x, displayUnit)} onChange={(v) => updateRect({ x: displayToUm(v, displayUnit) })} step={opts.step} className={INPUT_CLS + ' flex-1'} />
+                <span className={AXIS_CLS + ' w-10 text-right shrink-0'}>{displayUnit}</span>
+              </div>
+              <div className={ROW_CLS + ' w-full'}>
+                <span className={AXIS_CLS + ' w-4 shrink-0'}>Y</span>
+                <NumericInput value={umToDisplay(shape.rect.y, displayUnit)} onChange={(v) => updateRect({ y: displayToUm(v, displayUnit) })} step={opts.step} className={INPUT_CLS + ' flex-1'} />
+                <span className={AXIS_CLS + ' w-10 text-right shrink-0'}>{displayUnit}</span>
               </div>
             </div>
           </Tooltip>
 
           <Tooltip text="Width (X) and height (Y) of the rectangle" side="right">
-            <div className={dblRow}>
-              <span className={`text-[10px] font-mono font-semibold text-gray-400 dark:text-[#555]${stacked ? '' : ' w-12 shrink-0'}`}>Size</span>
-              <div className={`flex items-center gap-1${stacked ? ' w-full' : ' flex-1'}`}>
-                <span className={AXIS_CLS}>X</span>
-                <NumericInput value={umToDisplay(shape.rect.width, displayUnit)} onChange={(v) => updateRect({ width: Math.max(0.001, displayToUm(v, displayUnit)) })} step={opts.step} className={`${INPUT_CLS} ${minW}`} />
-                <span className={AXIS_CLS}>Y</span>
-                <NumericInput value={umToDisplay(shape.rect.height, displayUnit)} onChange={(v) => updateRect({ height: Math.max(0.001, displayToUm(v, displayUnit)) })} step={opts.step} className={`${INPUT_CLS} ${minW}`} />
-                <span className={AXIS_CLS + ' w-6 text-right'}>{displayUnit}</span>
+            <div className="space-y-0.5 w-full">
+              <span className="text-[10px] font-mono font-semibold text-gray-400 dark:text-[#555]">Size</span>
+              <div className={ROW_CLS + ' w-full'}>
+                <span className={AXIS_CLS + ' w-4 shrink-0'}>W</span>
+                <NumericInput value={umToDisplay(shape.rect.width, displayUnit)} onChange={(v) => updateRect({ width: Math.max(0.001, displayToUm(v, displayUnit)) })} step={opts.step} className={INPUT_CLS + ' flex-1'} />
+                <span className={AXIS_CLS + ' w-10 text-right shrink-0'}>{displayUnit}</span>
+              </div>
+              <div className={ROW_CLS + ' w-full'}>
+                <span className={AXIS_CLS + ' w-4 shrink-0'}>H</span>
+                <NumericInput value={umToDisplay(shape.rect.height, displayUnit)} onChange={(v) => updateRect({ height: Math.max(0.001, displayToUm(v, displayUnit)) })} step={opts.step} className={INPUT_CLS + ' flex-1'} />
+                <span className={AXIS_CLS + ' w-10 text-right shrink-0'}>{displayUnit}</span>
               </div>
             </div>
           </Tooltip>
@@ -238,14 +238,17 @@ export default function ShapeControls({
           <p className={LABEL_CLS + ' mb-1'}>Dimensions</p>
 
           <Tooltip text="Center point X and Y coordinates of the circle" side="right">
-            <div className={dblRow}>
-              <span className={`text-[10px] font-mono font-semibold text-gray-400 dark:text-[#555]${stacked ? '' : ' w-12 shrink-0'}`}>Center</span>
-              <div className={`flex items-center gap-1${stacked ? ' w-full' : ' flex-1'}`}>
-                <span className={AXIS_CLS}>X</span>
-                <NumericInput value={umToDisplay(shape.circle.cx, displayUnit)} onChange={(v) => updateCircle({ cx: displayToUm(v, displayUnit) })} step={opts.step} className={`${INPUT_CLS} ${minW}`} />
-                <span className={AXIS_CLS}>Y</span>
-                <NumericInput value={umToDisplay(shape.circle.cy, displayUnit)} onChange={(v) => updateCircle({ cy: displayToUm(v, displayUnit) })} step={opts.step} className={`${INPUT_CLS} ${minW}`} />
-                <span className={AXIS_CLS + ' w-6 text-right'}>{displayUnit}</span>
+            <div className="space-y-0.5 w-full">
+              <span className="text-[10px] font-mono font-semibold text-gray-400 dark:text-[#555]">Center</span>
+              <div className={ROW_CLS + ' w-full'}>
+                <span className={AXIS_CLS + ' w-4 shrink-0'}>X</span>
+                <NumericInput value={umToDisplay(shape.circle.cx, displayUnit)} onChange={(v) => updateCircle({ cx: displayToUm(v, displayUnit) })} step={opts.step} className={INPUT_CLS + ' flex-1'} />
+                <span className={AXIS_CLS + ' w-10 text-right shrink-0'}>{displayUnit}</span>
+              </div>
+              <div className={ROW_CLS + ' w-full'}>
+                <span className={AXIS_CLS + ' w-4 shrink-0'}>Y</span>
+                <NumericInput value={umToDisplay(shape.circle.cy, displayUnit)} onChange={(v) => updateCircle({ cy: displayToUm(v, displayUnit) })} step={opts.step} className={INPUT_CLS + ' flex-1'} />
+                <span className={AXIS_CLS + ' w-10 text-right shrink-0'}>{displayUnit}</span>
               </div>
             </div>
           </Tooltip>
@@ -253,8 +256,8 @@ export default function ShapeControls({
           <Tooltip text="Radius of the circle" side="right">
             <div className={ROW_CLS + ' w-full'}>
               <span className="text-[10px] font-mono font-semibold text-gray-400 dark:text-[#555] w-12 shrink-0">Radius</span>
-              <NumericInput value={umToDisplay(shape.circle.radius, displayUnit)} onChange={(v) => updateCircle({ radius: Math.max(0.001, displayToUm(v, displayUnit)) })} step={opts.step} className={`${INPUT_CLS} ${inputMinW(displayUnit)}`} />
-              <span className={AXIS_CLS + ' w-6 text-right'}>{displayUnit}</span>
+              <NumericInput value={umToDisplay(shape.circle.radius, displayUnit)} onChange={(v) => updateCircle({ radius: Math.max(0.001, displayToUm(v, displayUnit)) })} step={opts.step} className={INPUT_CLS + ' flex-1'} />
+              <span className={AXIS_CLS + ' w-10 text-right shrink-0'}>{displayUnit}</span>
             </div>
           </Tooltip>
         </div>
@@ -286,7 +289,7 @@ export default function ShapeControls({
                 : dragIndex === i
                 ? ' opacity-40 border-dashed border-gray-300 dark:border-[#555]'
                 : ' border-transparent hover:bg-gray-50 dark:hover:bg-[#252525]'
-              const rowCls = rowBase + rowState + (stacked ? ' flex flex-col items-start gap-0.5' : ' flex items-center gap-1')
+              const rowCls = rowBase + rowState + ' flex flex-col items-start gap-0.5'
 
               return (
                 <div
@@ -305,40 +308,27 @@ export default function ShapeControls({
                   onDragEnd={() => { setDragIndex(null); setDragOverIndex(null) }}
                   className={rowCls}
                 >
-                  {/* Header: drag handle + point label + (in stacked: delete button) */}
+                  {/* Header: drag handle + point label + delete button */}
                   <div className="flex items-center gap-1 w-full">
                     <span className="text-gray-300 cursor-grab active:cursor-grabbing select-none shrink-0 text-sm leading-none hover:text-gray-500 dark:text-[#444] dark:hover:text-[#888]" title="Drag to reorder">⠿</span>
                     <span className="text-[10px] font-mono font-semibold text-blue-500 w-6 shrink-0 dark:text-[#4a9eff]">P{i + 1}</span>
-                    {stacked && <span className="flex-1" />}
-                    {stacked && (
-                      <Tooltip text={pts.length <= 3 ? 'Need at least 3 points' : `Remove point P${i + 1}`} side="right">
-                        <button onClick={removePoint} disabled={pts.length <= 3} className="text-gray-300 hover:text-red-400 disabled:opacity-20 disabled:cursor-not-allowed text-sm leading-none shrink-0 transition-colors dark:text-[#444]">×</button>
-                      </Tooltip>
-                    )}
+                    <span className="flex-1" />
+                    <Tooltip text={pts.length <= 3 ? 'Need at least 3 points' : `Remove point P${i + 1}`} side="right">
+                      <button onClick={removePoint} disabled={pts.length <= 3} className="text-gray-300 hover:text-red-400 disabled:opacity-20 disabled:cursor-not-allowed text-sm leading-none shrink-0 transition-colors dark:text-[#444]">×</button>
+                    </Tooltip>
                   </div>
-                  {/* Inputs row */}
-                  {stacked ? (
-                    <div className="flex items-center gap-1 w-full">
-                      <span className={AXIS_CLS}>X</span>
-                      <NumericInput value={umToDisplay(p.x, displayUnit)} onChange={(v) => updatePoint('x', displayToUm(v, displayUnit))} step={opts.step} className={`${INPUT_CLS} ${minW}`} />
-                      <span className={AXIS_CLS}>Y</span>
-                      <NumericInput value={umToDisplay(p.y, displayUnit)} onChange={(v) => updatePoint('y', displayToUm(v, displayUnit))} step={opts.step} className={`${INPUT_CLS} ${minW}`} />
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex items-center gap-0.5 flex-1">
-                        <span className={AXIS_CLS}>X</span>
-                        <NumericInput value={umToDisplay(p.x, displayUnit)} onChange={(v) => updatePoint('x', displayToUm(v, displayUnit))} step={opts.step} className={`${INPUT_CLS} ${minW}`} />
-                      </div>
-                      <div className="flex items-center gap-0.5 flex-1">
-                        <span className={AXIS_CLS}>Y</span>
-                        <NumericInput value={umToDisplay(p.y, displayUnit)} onChange={(v) => updatePoint('y', displayToUm(v, displayUnit))} step={opts.step} className={`${INPUT_CLS} ${minW}`} />
-                      </div>
-                      <Tooltip text={pts.length <= 3 ? 'Need at least 3 points' : `Remove point P${i + 1}`} side="right">
-                        <button onClick={removePoint} disabled={pts.length <= 3} className="text-gray-300 hover:text-red-400 disabled:opacity-20 disabled:cursor-not-allowed text-sm leading-none shrink-0 transition-colors dark:text-[#444]">×</button>
-                      </Tooltip>
-                    </>
-                  )}
+                  {/* X row */}
+                  <div className={ROW_CLS + ' w-full'}>
+                    <span className={AXIS_CLS + ' w-4 shrink-0'}>X</span>
+                    <NumericInput value={umToDisplay(p.x, displayUnit)} onChange={(v) => updatePoint('x', displayToUm(v, displayUnit))} step={opts.step} className={INPUT_CLS + ' flex-1'} />
+                    <span className={AXIS_CLS + ' w-10 text-right shrink-0'}>{displayUnit}</span>
+                  </div>
+                  {/* Y row */}
+                  <div className={ROW_CLS + ' w-full'}>
+                    <span className={AXIS_CLS + ' w-4 shrink-0'}>Y</span>
+                    <NumericInput value={umToDisplay(p.y, displayUnit)} onChange={(v) => updatePoint('y', displayToUm(v, displayUnit))} step={opts.step} className={INPUT_CLS + ' flex-1'} />
+                    <span className={AXIS_CLS + ' w-10 text-right shrink-0'}>{displayUnit}</span>
+                  </div>
                 </div>
               )
             })}

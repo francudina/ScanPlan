@@ -5,7 +5,6 @@ import {
   DISPLAY_UNIT_OPTIONS,
   displayToUm,
   fmtDisplay,
-  inputMinW,
   mmToUm,
   umToDisplay,
 } from '../../utils/units'
@@ -70,34 +69,32 @@ function NumericInput({
 export default function StageSettings({ constraints, displayUnit, onChange }: Props) {
   const set = (patch: Partial<StageConstraints>) => onChange({ ...constraints, ...patch })
   const opts = DISPLAY_UNIT_OPTIONS.find((o) => o.value === displayUnit)!
-  const stacked = displayUnit === 'nm' || displayUnit === 'µm'
-  const minW = inputMinW(displayUnit)
-  const dblRow = stacked
-    ? 'flex flex-col items-start gap-0.5 w-full rounded px-1 py-0.5 transition-colors border border-transparent hover:bg-gray-50 dark:hover:bg-[#252525]'
-    : `${ROW_CLS} w-full`
 
   return (
     <section className="space-y-3">
-      {/* Size row — Width and Height */}
+      {/* Size — Width and Height each on their own line */}
       <Tooltip text="Maximum horizontal and vertical scan range of the DXR3 stage" side="right">
-        <div className={dblRow}>
-          <span className={`text-[10px] font-mono font-semibold text-gray-400 dark:text-[#555]${stacked ? '' : ' w-12 shrink-0'}`}>Size</span>
-          <div className={`flex items-center gap-1${stacked ? ' w-full' : ' flex-1'}`}>
-            <span className={AXIS_CLS}>W</span>
+        <div className="space-y-0.5">
+          <span className={LABEL_CLS}>Stage Size</span>
+          <div className={ROW_CLS + ' w-full'}>
+            <span className={AXIS_CLS + ' w-4 shrink-0'}>W</span>
             <NumericInput
               value={umToDisplay(constraints.max_scan_width, displayUnit)}
               onChange={(v) => set({ max_scan_width: displayToUm(v, displayUnit) })}
               step={opts.step}
-              className={`${INPUT_CLS} ${minW}`}
+              className={INPUT_CLS + ' flex-1'}
             />
-            <span className={AXIS_CLS}>H</span>
+            <span className={AXIS_CLS + ' w-10 text-right shrink-0'}>{displayUnit}</span>
+          </div>
+          <div className={ROW_CLS + ' w-full'}>
+            <span className={AXIS_CLS + ' w-4 shrink-0'}>H</span>
             <NumericInput
               value={umToDisplay(constraints.max_scan_height, displayUnit)}
               onChange={(v) => set({ max_scan_height: displayToUm(v, displayUnit) })}
               step={opts.step}
-              className={`${INPUT_CLS} ${minW}`}
+              className={INPUT_CLS + ' flex-1'}
             />
-            <span className={AXIS_CLS + ' w-6 text-right'}>{displayUnit}</span>
+            <span className={AXIS_CLS + ' w-10 text-right shrink-0'}>{displayUnit}</span>
           </div>
         </div>
       </Tooltip>
@@ -108,7 +105,7 @@ export default function StageSettings({ constraints, displayUnit, onChange }: Pr
           <span className="text-[10px] font-mono font-semibold text-gray-400 dark:text-[#555] w-12 shrink-0">Time</span>
           <input
             type="number"
-            className={INPUT_CLS + ' w-20 shrink-0'}
+            className={INPUT_CLS + ' flex-1'}
             value={constraints.time_per_point_seconds.toFixed(2)}
             min={0.01}
             step={0.01}
@@ -117,7 +114,7 @@ export default function StageSettings({ constraints, displayUnit, onChange }: Pr
               if (!isNaN(n) && n > 0) set({ time_per_point_seconds: Math.round(n * 100) / 100 })
             }}
           />
-          <span className={AXIS_CLS}>sec / pt</span>
+          <span className={AXIS_CLS + ' w-10 text-right shrink-0'}>s / pt</span>
         </div>
       </Tooltip>
 
