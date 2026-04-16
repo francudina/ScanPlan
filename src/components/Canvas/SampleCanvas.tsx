@@ -1459,38 +1459,13 @@ export default function SampleCanvas({
           ))}
         </div>
 
-        {/* Center / fit button */}
-        <button
-          title={shape ? 'Fit shape in view' : 'Reset view to origin'}
-          onClick={() => {
-            if (shape) {
-              const bbox = shapeBoundingBox(shape)
-              if (bbox) setVp(fitViewport(bbox.xMin, bbox.yMin, bbox.xMax, bbox.yMax, size.w, size.h))
-            } else {
-              const SCALE = 0.004
-              setVp({ scale: SCALE, left: -(size.w / 2) / SCALE, top: -(size.h / 2) / SCALE })
-            }
-          }}
-          className="w-7 h-7 flex items-center justify-center rounded shadow border border-gray-200 dark:border-[#3a3a3a]
-            bg-white/90 dark:bg-[#2c2c2c]/90 text-gray-600 dark:text-[#aaa]
-            hover:bg-gray-100 dark:hover:bg-[#3a3a3a] transition-colors backdrop-blur-sm"
-        >
-          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="w-3.5 h-3.5">
-            <circle cx="7" cy="7" r="2.5" />
-            <line x1="7" y1="1" x2="7" y2="4" />
-            <line x1="7" y1="10" x2="7" y2="13" />
-            <line x1="1" y1="7" x2="4" y2="7" />
-            <line x1="10" y1="7" x2="13" y2="7" />
-          </svg>
-        </button>
-
         {/* D-pad */}
         <div className="grid grid-cols-3 gap-0.5">
           {([
             { label: '↑', col: 2, row: 1, dx:  0,    dy: -0.25 },
             { label: '←', col: 1, row: 2, dx: -0.25, dy:  0    },
-            { label: '↓', col: 2, row: 2, dx:  0,    dy:  0.25 },
             { label: '→', col: 3, row: 2, dx:  0.25, dy:  0    },
+            { label: '↓', col: 2, row: 3, dx:  0,    dy:  0.25 },
           ] as const).map(({ label, col, row, dx, dy }) => (
             <button
               key={label}
@@ -1511,6 +1486,33 @@ export default function SampleCanvas({
               {label}
             </button>
           ))}
+
+          {/* Center button */}
+          <button
+            title={shape ? 'Fit shape in view' : 'Reset view to origin'}
+            onClick={() => {
+              if (shape) {
+                const bbox = shapeBoundingBox(shape)
+                if (bbox) setVp(fitViewport(bbox.xMin, bbox.yMin, bbox.xMax, bbox.yMax, size.w, size.h))
+              } else {
+                const SCALE = 0.004
+                setVp({ scale: SCALE, left: -(size.w / 2) / SCALE, top: -(size.h / 2) / SCALE })
+              }
+            }}
+            style={{ gridColumn: 2, gridRow: 2 }}
+            className="w-7 h-7 flex items-center justify-center rounded shadow
+              bg-white/90 dark:bg-[#2c2c2c]/90 border border-gray-200 dark:border-[#3a3a3a]
+              text-gray-500 dark:text-[#aaa] hover:bg-gray-100 dark:hover:bg-[#3a3a3a]
+              transition-colors backdrop-blur-sm"
+          >
+            <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="w-3.5 h-3.5">
+              <circle cx="7" cy="7" r="2" />
+              <line x1="7" y1="1" x2="7" y2="4" />
+              <line x1="7" y1="10" x2="7" y2="13" />
+              <line x1="1" y1="7" x2="4" y2="7" />
+              <line x1="10" y1="7" x2="13" y2="7" />
+            </svg>
+          </button>
         </div>
       </div>
 
