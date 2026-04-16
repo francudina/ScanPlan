@@ -24,7 +24,7 @@ import {
   umToPixel,
   zoomViewport,
 } from '../../utils/geometry'
-import { type DisplayUnit, fmtAreaDisplay, fmtDisplay } from '../../utils/units'
+import { type DisplayUnit, fmtAreaDisplay, fmtDisplay, umToDisplay } from '../../utils/units'
 
 // Pass colours for multi-pass scans
 const PASS_COLORS = ['#3b82f6', '#f97316', '#22c55e', '#a855f7', '#ef4444', '#06b6d4']
@@ -69,7 +69,14 @@ interface Props {
 
 // ── Grid lines helper ──────────────────────────────────────────────────────────
 
-function CoordGrid({ vp, width, height, darkMode, displayUnit }: { vp: Viewport; width: number; height: number; darkMode: boolean; displayUnit: DisplayUnit }) {
+/** Choose the most readable unit for the current grid spacing (µm). */
+function autoGridUnit(spacingUm: number): DisplayUnit {
+  if (spacingUm >= 1_000) return 'mm'
+  if (spacingUm >= 1)     return 'µm'
+  return 'nm'
+}
+
+function CoordGrid({ vp, width, height, darkMode }: { vp: Viewport; width: number; height: number; darkMode: boolean }) {
   const gridColor = darkMode ? '#2e2e2e' : '#e5e7eb'
   const labelColor = darkMode ? '#555' : '#9ca3af'
 
@@ -78,6 +85,13 @@ function CoordGrid({ vp, width, height, darkMode, displayUnit }: { vp: Viewport;
   const magnitude = Math.pow(10, Math.floor(Math.log10(rawSpacing)))
   const candidates = [1, 2, 5, 10].map((m) => m * magnitude)
   const spacing = candidates.find((c) => c * vp.scale >= 60) ?? candidates[candidates.length - 1]
+
+  // Automatically pick mm / µm / nm based on zoom level — sidebar unit is unaffected
+  const gridUnit = autoGridUnit(spacing)
+
+  // Decimal places: 0 when spacing is a whole number in the chosen unit, more when sub-unit
+  const spacingInUnit = umToDisplay(spacing, gridUnit)
+  const labelDecimals = spacingInUnit >= 1 ? 0 : Math.ceil(-Math.log10(spacingInUnit) + 1e-10)
 
   const lines: React.ReactElement[] = []
   const xStart = Math.floor(vp.left / spacing) * spacing
@@ -93,7 +107,7 @@ function CoordGrid({ vp, width, height, darkMode, displayUnit }: { vp: Viewport;
         key={`tx${x}`}
         x={px + 2}
         y={4}
-        text={fmtDisplay(x, displayUnit, 0)}
+        text={fmtDisplay(x, gridUnit, labelDecimals)}
         fontSize={11}
         fill={labelColor}
         listening={false}
@@ -110,7 +124,7 @@ function CoordGrid({ vp, width, height, darkMode, displayUnit }: { vp: Viewport;
         key={`ty${y}`}
         x={4}
         y={py + 2}
-        text={fmtDisplay(y, displayUnit, 0)}
+        text={fmtDisplay(y, gridUnit, labelDecimals)}
         fontSize={11}
         fill={labelColor}
         listening={false}
@@ -808,7 +822,7 @@ export default function SampleCanvas({
       >
         {/* Background + coordinate grid (not transformed — drawn in pixel space) */}
         <Layer listening={false}>
-          <CoordGrid vp={vp} width={size.w} height={size.h} darkMode={darkMode} displayUnit={displayUnit} />
+          <CoordGrid vp={vp} width={size.w} height={size.h} darkMode={darkMode} />
           {/* Axes */}
           <Line
             points={[toX(0), 0, toX(0), size.h]}
