@@ -5,6 +5,7 @@ import {
   DISPLAY_UNIT_OPTIONS,
   displayToUm,
   fmtDisplay,
+  inputMinW,
   mmToUm,
   umToDisplay,
 } from '../../utils/units'
@@ -23,94 +24,102 @@ const INPUT_CLS =
 
 const LABEL_CLS = 'text-[10px] font-medium text-gray-500 dark:text-[#888] uppercase tracking-wide select-none'
 
-function StageField({
-  label,
-  hint,
-  valueUm,
-  onChangeUm,
-  displayUnit,
-}: {
-  label: string
-  hint: string
-  valueUm: number
-  onChangeUm: (um: number) => void
-  displayUnit: DisplayUnit
-}) {
-  const opts = DISPLAY_UNIT_OPTIONS.find((o) => o.value === displayUnit)!
-  const [raw, setRaw] = useState(String(umToDisplay(valueUm, displayUnit)))
+const ROW_CLS =
+  'flex items-center gap-1 rounded px-1 py-0.5 transition-colors border border-transparent ' +
+  'hover:bg-gray-50 dark:hover:bg-[#252525]'
 
-  useEffect(() => {
-    setRaw(String(umToDisplay(valueUm, displayUnit)))
-  }, [valueUm, displayUnit])
+const AXIS_CLS = 'text-[10px] text-gray-400 dark:text-[#555] shrink-0'
+
+function NumericInput({
+  value,
+  onChange,
+  step = 0.1,
+  min,
+  className = '',
+}: {
+  value: number
+  onChange: (n: number) => void
+  step?: number
+  min?: number
+  className?: string
+}) {
+  const [raw, setRaw] = useState(String(value))
+  useEffect(() => { setRaw(String(value)) }, [value])
 
   return (
-    <div className="flex flex-col gap-0.5">
-      <Tooltip text={hint} side="right">
-        <span className={LABEL_CLS + ' cursor-default border-b border-dashed border-gray-400 dark:border-[#444]'}>{label}</span>
-      </Tooltip>
-      <div className="flex items-center gap-1">
-        <input
-          type="number"
-          className={INPUT_CLS}
-          value={raw}
-          step={opts.step}
-          onChange={(e) => {
-            setRaw(e.target.value)
-            const n = parseFloat(e.target.value)
-            if (!isNaN(n) && isFinite(n) && n > 0) onChangeUm(displayToUm(n, displayUnit))
-          }}
-          onBlur={() => {
-            const n = parseFloat(raw)
-            if (isNaN(n) || !isFinite(n) || n <= 0) setRaw(String(umToDisplay(valueUm, displayUnit)))
-            else { setRaw(String(n)); onChangeUm(displayToUm(n, displayUnit)) }
-          }}
-        />
-        <span className="text-[10px] text-gray-400 dark:text-[#555] shrink-0 w-7 text-right">{displayUnit}</span>
-      </div>
-    </div>
+    <input
+      type="number"
+      step={step}
+      min={min}
+      value={raw}
+      className={className}
+      onChange={(e) => {
+        setRaw(e.target.value)
+        const n = parseFloat(e.target.value)
+        if (!isNaN(n) && isFinite(n) && n > 0) onChange(n)
+      }}
+      onBlur={() => {
+        const n = parseFloat(raw)
+        if (isNaN(n) || !isFinite(n) || n <= 0) setRaw(String(value))
+        else { setRaw(String(n)); onChange(n) }
+      }}
+    />
   )
 }
 
 export default function StageSettings({ constraints, displayUnit, onChange }: Props) {
   const set = (patch: Partial<StageConstraints>) => onChange({ ...constraints, ...patch })
+  const opts = DISPLAY_UNIT_OPTIONS.find((o) => o.value === displayUnit)!
+  const stacked = displayUnit === 'nm' || displayUnit === 'µm'
+  const minW = inputMinW(displayUnit)
+  const dblRow = stacked
+    ? 'flex flex-col items-start gap-0.5 w-full rounded px-1 py-0.5 transition-colors border border-transparent hover:bg-gray-50 dark:hover:bg-[#252525]'
+    : `${ROW_CLS} w-full`
 
   return (
     <section className="space-y-3">
-      <div className="grid grid-cols-2 gap-2">
-        <StageField
-          label="Max width"
-          hint="Maximum horizontal scan range of the DXR3 stage"
-          valueUm={constraints.max_scan_width}
-          onChangeUm={(v) => set({ max_scan_width: v })}
-          displayUnit={displayUnit}
-        />
-        <StageField
-          label="Max height"
-          hint="Maximum vertical scan range of the DXR3 stage"
-          valueUm={constraints.max_scan_height}
-          onChangeUm={(v) => set({ max_scan_height: v })}
-          displayUnit={displayUnit}
-        />
-      </div>
+      {/* Size row — Width and Height */}
+      <Tooltip text="Maximum horizontal and vertical scan range of the DXR3 stage" side="right">
+        <div className={dblRow}>
+          <span className={`text-[10px] font-mono font-semibold text-gray-400 dark:text-[#555]${stacked ? '' : ' w-12 shrink-0'}`}>Size</span>
+          <div className={`flex items-center gap-1${stacked ? ' w-full' : ' flex-1'}`}>
+            <span className={AXIS_CLS}>W</span>
+            <NumericInput
+              value={umToDisplay(constraints.max_scan_width, displayUnit)}
+              onChange={(v) => set({ max_scan_width: displayToUm(v, displayUnit) })}
+              step={opts.step}
+              className={`${INPUT_CLS} ${minW}`}
+            />
+            <span className={AXIS_CLS}>H</span>
+            <NumericInput
+              value={umToDisplay(constraints.max_scan_height, displayUnit)}
+              onChange={(v) => set({ max_scan_height: displayToUm(v, displayUnit) })}
+              step={opts.step}
+              className={`${INPUT_CLS} ${minW}`}
+            />
+            <span className={AXIS_CLS + ' w-6 text-right'}>{displayUnit}</span>
+          </div>
+        </div>
+      </Tooltip>
 
-      <div className="flex flex-col gap-0.5">
-        <Tooltip text="Acquisition time per spectrum point. Used to estimate total scan duration." side="right">
-          <span className={LABEL_CLS + ' cursor-default border-b border-dashed border-gray-400 dark:border-[#444]'}>Time per point</span>
-        </Tooltip>
-        <div className="flex items-center gap-1">
+      {/* Time per point row */}
+      <Tooltip text="Acquisition time per spectrum point. Used to estimate total scan duration." side="right">
+        <div className={ROW_CLS + ' w-full'}>
+          <span className="text-[10px] font-mono font-semibold text-gray-400 dark:text-[#555] w-12 shrink-0">Time</span>
           <input
             type="number"
-            className={INPUT_CLS + ' w-20'}
-            value={constraints.time_per_point_seconds}
-            min={0.1}
-            step={0.5}
-            onChange={(e) =>
-              set({ time_per_point_seconds: parseFloat(e.target.value) || 1 })
-            }
+            className={INPUT_CLS + ' w-20 shrink-0'}
+            value={constraints.time_per_point_seconds.toFixed(2)}
+            min={0.01}
+            step={0.01}
+            onChange={(e) => {
+              const n = parseFloat(e.target.value)
+              if (!isNaN(n) && n > 0) set({ time_per_point_seconds: Math.round(n * 100) / 100 })
+            }}
           />
-          <span className="text-[10px] text-gray-400 dark:text-[#555] shrink-0">sec</span>
+          <span className={AXIS_CLS}>sec / pt</span>
         </div>
-      </div>
+      </Tooltip>
 
       {/* DXR3 presets */}
       <div className="flex flex-col gap-0.5">

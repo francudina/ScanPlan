@@ -94,7 +94,7 @@ function CoordGrid({ vp, width, height, darkMode, displayUnit }: { vp: Viewport;
         x={px + 2}
         y={4}
         text={fmtDisplay(x, displayUnit, 0)}
-        fontSize={9}
+        fontSize={11}
         fill={labelColor}
         listening={false}
       />,
@@ -111,7 +111,7 @@ function CoordGrid({ vp, width, height, darkMode, displayUnit }: { vp: Viewport;
         x={4}
         y={py + 2}
         text={fmtDisplay(y, displayUnit, 0)}
-        fontSize={9}
+        fontSize={11}
         fill={labelColor}
         listening={false}
       />,

@@ -5,6 +5,7 @@ import {
   DISPLAY_UNIT_OPTIONS,
   displayToUm,
   fmtDisplay,
+  inputMinW,
   umToDisplay,
 } from '../../utils/units'
 import Tooltip from '../UI/Tooltip'
@@ -24,51 +25,44 @@ const LABEL_CLS =
   'text-[10px] font-medium uppercase tracking-wide select-none cursor-default ' +
   'text-gray-500 dark:text-[#888]'
 
-function StepField({
-  label,
-  hint,
-  valueUm,
-  onChangeUm,
-  displayUnit,
-}: {
-  label: string
-  hint: string
-  valueUm: number
-  onChangeUm: (um: number) => void
-  displayUnit: DisplayUnit
-}) {
-  const opts = DISPLAY_UNIT_OPTIONS.find((o) => o.value === displayUnit)!
-  const [raw, setRaw] = useState(String(umToDisplay(valueUm, displayUnit)))
+const ROW_CLS =
+  'flex items-center gap-1 rounded px-1 py-0.5 transition-colors border border-transparent ' +
+  'hover:bg-gray-50 dark:hover:bg-[#252525]'
 
-  useEffect(() => {
-    setRaw(String(umToDisplay(valueUm, displayUnit)))
-  }, [valueUm, displayUnit])
+const AXIS_CLS = 'text-[10px] text-gray-400 dark:text-[#555] shrink-0'
+
+/** Buffered numeric input — lets user type partially without field resetting */
+function NumericInput({
+  value,
+  onChange,
+  step = 0.1,
+  className = '',
+}: {
+  value: number
+  onChange: (n: number) => void
+  step?: number
+  className?: string
+}) {
+  const [raw, setRaw] = useState(String(value))
+  useEffect(() => { setRaw(String(value)) }, [value])
 
   return (
-    <div className="flex flex-col gap-0.5">
-      <Tooltip text={hint} side="right">
-        <span className={LABEL_CLS + ' border-b border-dashed border-gray-400 dark:border-[#444]'}>{label}</span>
-      </Tooltip>
-      <div className="flex items-center gap-1">
-        <input
-          type="number"
-          className={INPUT_CLS}
-          value={raw}
-          step={opts.step}
-          onChange={(e) => {
-            setRaw(e.target.value)
-            const n = parseFloat(e.target.value)
-            if (!isNaN(n) && isFinite(n) && n > 0) onChangeUm(displayToUm(n, displayUnit))
-          }}
-          onBlur={() => {
-            const n = parseFloat(raw)
-            if (isNaN(n) || !isFinite(n) || n <= 0) setRaw(String(umToDisplay(valueUm, displayUnit)))
-            else { setRaw(String(n)); onChangeUm(displayToUm(n, displayUnit)) }
-          }}
-        />
-        <span className="text-[10px] shrink-0 w-7 text-right text-gray-400 dark:text-[#555]">{displayUnit}</span>
-      </div>
-    </div>
+    <input
+      type="number"
+      step={step}
+      value={raw}
+      className={className}
+      onChange={(e) => {
+        setRaw(e.target.value)
+        const n = parseFloat(e.target.value)
+        if (!isNaN(n) && isFinite(n) && n > 0) onChange(n)
+      }}
+      onBlur={() => {
+        const n = parseFloat(raw)
+        if (isNaN(n) || !isFinite(n) || n <= 0) setRaw(String(value))
+        else { setRaw(String(n)); onChange(n) }
+      }}
+    />
   )
 }
 
@@ -77,45 +71,57 @@ const PRESETS_UM = [1, 5, 10, 25, 50, 100, 500, 1000]
 export default function ScanParamsForm({ params, displayUnit, onChange }: Props) {
   const set = (patch: Partial<ScanParameters>) => onChange({ ...params, ...patch })
   const opts = DISPLAY_UNIT_OPTIONS.find((o) => o.value === displayUnit)!
+  const stacked = displayUnit === 'nm' || displayUnit === 'µm'
+  const minW = inputMinW(displayUnit)
+  const dblRow = stacked
+    ? 'flex flex-col items-start gap-0.5 w-full rounded px-1 py-0.5 transition-colors border border-transparent hover:bg-gray-50 dark:hover:bg-[#252525]'
+    : `${ROW_CLS} w-full`
 
   return (
     <section className="space-y-3">
-      <div className="grid grid-cols-2 gap-2">
-        <StepField
-          label="Step X (ΔX)"
-          hint="Horizontal distance between adjacent scan points"
-          valueUm={params.step_x}
-          onChangeUm={(v) => set({ step_x: Math.max(0.001, v) })}
-          displayUnit={displayUnit}
-        />
-        <StepField
-          label="Step Y (ΔY)"
-          hint="Vertical distance between adjacent scan points"
-          valueUm={params.step_y}
-          onChangeUm={(v) => set({ step_y: Math.max(0.001, v) })}
-          displayUnit={displayUnit}
-        />
-      </div>
+      {/* Offset row */}
+      <Tooltip text="Distance between adjacent scan points (ΔX horizontal, ΔY vertical)" side="right">
+        <div className={dblRow}>
+          <span className={`text-[10px] font-mono font-semibold text-gray-400 dark:text-[#555]${stacked ? '' : ' w-12 shrink-0'}`}>Offset</span>
+          <div className={`flex items-center gap-1${stacked ? ' w-full' : ' flex-1'}`}>
+            <span className={AXIS_CLS}>X</span>
+            <NumericInput
+              value={umToDisplay(params.step_x, displayUnit)}
+              onChange={(v) => set({ step_x: Math.max(0.001, displayToUm(v, displayUnit)) })}
+              step={opts.step}
+              className={`${INPUT_CLS} ${minW}`}
+            />
+            <span className={AXIS_CLS}>Y</span>
+            <NumericInput
+              value={umToDisplay(params.step_y, displayUnit)}
+              onChange={(v) => set({ step_y: Math.max(0.001, displayToUm(v, displayUnit)) })}
+              step={opts.step}
+              className={`${INPUT_CLS} ${minW}`}
+            />
+            <span className={AXIS_CLS + ' w-6 text-right'}>{displayUnit}</span>
+          </div>
+        </div>
+      </Tooltip>
 
       {/* Overlap */}
       <div className="flex flex-col gap-1">
         <Tooltip text="Fraction of step size that adjacent points overlap. 0% = no overlap, 50% = half-step overlap" side="right">
-          <span className={LABEL_CLS + ' border-b border-dashed border-gray-400 dark:border-[#444]'}>Overlap</span>
+          <div className={ROW_CLS + ' w-full'}>
+            <span className="text-[10px] font-mono font-semibold text-gray-400 dark:text-[#555] w-12 shrink-0">Overlap</span>
+            <input
+              type="range"
+              className="flex-1 h-1 appearance-none rounded cursor-pointer accent-blue-500 bg-gray-300 dark:accent-[#4a9eff] dark:bg-[#444]"
+              min={0} max={0.5} step={0.01}
+              value={params.overlap}
+              onChange={(e) => set({ overlap: parseFloat(e.target.value) })}
+            />
+            <span className="text-xs font-mono w-10 text-right shrink-0 text-gray-700 dark:text-[#d4d4d4]">
+              {(params.overlap * 100).toFixed(0)}%
+            </span>
+          </div>
         </Tooltip>
-        <div className="flex items-center gap-2">
-          <input
-            type="range"
-            className="flex-1 h-1 appearance-none rounded cursor-pointer accent-blue-500 bg-gray-300 dark:accent-[#4a9eff] dark:bg-[#444]"
-            min={0} max={0.5} step={0.01}
-            value={params.overlap}
-            onChange={(e) => set({ overlap: parseFloat(e.target.value) })}
-          />
-          <span className="text-xs font-mono w-10 text-right shrink-0 text-gray-700 dark:text-[#d4d4d4]">
-            {(params.overlap * 100).toFixed(0)}%
-          </span>
-        </div>
         {params.overlap > 0 && (
-          <span className="text-[10px] font-mono leading-relaxed text-gray-400 dark:text-[#555]">
+          <span className="text-[10px] font-mono leading-relaxed text-gray-400 dark:text-[#555] px-1">
             eff ΔX: {fmtDisplay(params.step_x * (1 - params.overlap), displayUnit, opts.decimals)}
             &nbsp;&nbsp;ΔY: {fmtDisplay(params.step_y * (1 - params.overlap), displayUnit, opts.decimals)}
           </span>

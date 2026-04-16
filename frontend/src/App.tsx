@@ -28,7 +28,7 @@ const DEFAULT_SCAN_PARAMS: ScanParameters = {
 const DEFAULT_STAGE: StageConstraints = {
   max_scan_width: mmToUm(25),
   max_scan_height: mmToUm(25),
-  time_per_point_seconds: 5,
+  time_per_point_seconds: 1,
 }
 
 // ── Collapsible panel ─────────────────────────────────────────────────────────
@@ -289,7 +289,7 @@ export default function App() {
             />
           </CollapsiblePanel>
 
-          <CollapsiblePanel title="Stage Constraints" defaultOpen={false}>
+          <CollapsiblePanel title="Stage Constraints" defaultOpen>
             <StageSettings
               constraints={stage}
               displayUnit={displayUnit}

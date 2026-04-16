@@ -105,6 +105,19 @@ export function fmtMm2(mm2: number): string {
   return `${fmt(mm2, 4)} mm²`
 }
 
+/**
+ * Returns a Tailwind min-width class for numeric inputs so numbers fit without
+ * truncation. Wider for units that produce larger digit counts (e.g. nm).
+ */
+export function inputMinW(unit: DisplayUnit): string {
+  switch (unit) {
+    case 'nm': return 'min-w-[76px]'
+    case 'µm': return 'min-w-[52px]'
+    case 'mm': return 'min-w-[56px]'
+    case 'cm': return 'min-w-[64px]'
+  }
+}
+
 // ── Legacy helpers (kept for internal use) ────────────────────────────────────
 
 /** Convert µm → mm */
