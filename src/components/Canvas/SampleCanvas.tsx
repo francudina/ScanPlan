@@ -607,13 +607,27 @@ export default function SampleCanvas({
       e.evt.preventDefault()
       const stage = e.target.getStage()!
       const pos = stage.getPointerPosition()!
+
+      // Pinch gesture on trackpad — browser sets ctrlKey=true for pinch on all platforms
       if (e.evt.ctrlKey) {
-        // Pinch gesture on trackpad (ctrlKey=true) → zoom
+        const cursorUm = pointerToUm(pos.x, pos.y, vp)
+        const factor = e.evt.deltaY < 0 ? 1.06 : 1 / 1.06
+        setVp((v) => zoomViewport(v, cursorUm.x, cursorUm.y, factor))
+        return
+      }
+
+      // deltaMode=1 (lines) or =2 (pages) → mouse wheel on Windows/Linux → zoom
+      // deltaMode=0 with large stepped deltaY and negligible deltaX → mouse wheel on Mac → zoom
+      // Otherwise → trackpad two-finger scroll → pan
+      const isMouse =
+        e.evt.deltaMode !== 0 ||
+        (Math.abs(e.evt.deltaY) >= 40 && Math.abs(e.evt.deltaX) < 2)
+
+      if (isMouse) {
         const cursorUm = pointerToUm(pos.x, pos.y, vp)
         const factor = e.evt.deltaY < 0 ? 1.06 : 1 / 1.06
         setVp((v) => zoomViewport(v, cursorUm.x, cursorUm.y, factor))
       } else {
-        // Two-finger scroll on trackpad → pan
         setVp((v) => ({
           ...v,
           left: v.left + e.evt.deltaX / v.scale,
