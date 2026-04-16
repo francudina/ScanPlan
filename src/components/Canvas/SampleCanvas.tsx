@@ -559,8 +559,14 @@ export default function SampleCanvas({
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null)
 
   // Refs for touch gesture tracking (refs = no stale-closure issues in touch handlers)
-  const pinchRef = useRef<{ dist: number; midX: number; midY: number } | null>(null)
+  const pinchRef = useRef<{
+    dist: number; midX: number; midY: number
+    startDist: number; startMidX: number; startMidY: number
+    gestureMode: 'undecided' | 'zoom' | 'pan'
+  } | null>(null)
   const lastTapRef = useRef<number>(0)
+  // Flag: we just finished a two-finger gesture — ignore the next single-finger pointerdown
+  const afterTwoFingerRef = useRef(false)
 
   // Responsive canvas sizing
   useEffect(() => {
@@ -601,9 +607,19 @@ export default function SampleCanvas({
       e.evt.preventDefault()
       const stage = e.target.getStage()!
       const pos = stage.getPointerPosition()!
-      const cursorUm = pointerToUm(pos.x, pos.y, vp)
-      const factor = e.evt.deltaY < 0 ? 1.06 : 1 / 1.06
-      setVp((v) => zoomViewport(v, cursorUm.x, cursorUm.y, factor))
+      if (e.evt.ctrlKey) {
+        // Pinch gesture on trackpad (ctrlKey=true) → zoom
+        const cursorUm = pointerToUm(pos.x, pos.y, vp)
+        const factor = e.evt.deltaY < 0 ? 1.06 : 1 / 1.06
+        setVp((v) => zoomViewport(v, cursorUm.x, cursorUm.y, factor))
+      } else {
+        // Two-finger scroll on trackpad → pan
+        setVp((v) => ({
+          ...v,
+          left: v.left + e.evt.deltaX / v.scale,
+          top: v.top + e.evt.deltaY / v.scale,
+        }))
+      }
     },
     [vp],
   )
@@ -825,19 +841,29 @@ export default function SampleCanvas({
     (e: KonvaEventObject<TouchEvent>) => {
       const touches = e.evt.touches
       if (touches.length === 2) {
-        // Two fingers: begin pinch — cancel any active pan/draw
+        // Two fingers: begin pinch/pan — cancel any active draw or pan
         setPanState(null)
+        setDrawState({ mode: 'idle' })
+        afterTwoFingerRef.current = false
         const t1 = touches[0], t2 = touches[1]
         const rect = containerRef.current?.getBoundingClientRect()
         if (!rect) return
+        const initDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY)
+        const initMidX = (t1.clientX + t2.clientX) / 2 - rect.left
+        const initMidY = (t1.clientY + t2.clientY) / 2 - rect.top
         pinchRef.current = {
-          dist: Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY),
-          midX: (t1.clientX + t2.clientX) / 2 - rect.left,
-          midY: (t1.clientY + t2.clientY) / 2 - rect.top,
+          dist: initDist, midX: initMidX, midY: initMidY,
+          startDist: initDist, startMidX: initMidX, startMidY: initMidY,
+          gestureMode: 'undecided',
         }
         return
       }
       if (touches.length === 1) {
+        // Ignore first single-finger event right after releasing a two-finger gesture
+        if (afterTwoFingerRef.current) {
+          afterTwoFingerRef.current = false
+          return
+        }
         const pos = e.target.getStage()!.getPointerPosition()!
         // Double-tap to close freeform polygon
         const now = Date.now()
@@ -869,16 +895,34 @@ export default function SampleCanvas({
         const newDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY)
         const newMidX = (t1.clientX + t2.clientX) / 2 - rect.left
         const newMidY = (t1.clientY + t2.clientY) / 2 - rect.top
-        const { dist: oldDist, midX: oldMidX, midY: oldMidY } = pinchRef.current
-        const scaleFactor = newDist / oldDist
+        const { dist: prevDist, midX: prevMidX, midY: prevMidY, startDist, startMidX, startMidY, gestureMode } = pinchRef.current
+
+        // Decide gesture mode once, based on cumulative movement from gesture start.
+        // This avoids per-frame noise flipping between zoom and pan.
+        let mode = gestureMode
+        if (mode === 'undecided') {
+          const cumulativeScale = newDist / startDist
+          const cumMidDist = Math.hypot(newMidX - startMidX, newMidY - startMidY)
+          if (Math.abs(cumulativeScale - 1) > 0.08) {
+            mode = 'zoom'
+          } else if (cumMidDist > 12) {
+            mode = 'pan'
+          }
+        }
+
+        const scaleFactor = newDist / prevDist
         setVp((v) => {
-          const midUm = pointerToUm(newMidX, newMidY, v)
-          const zoomed = zoomViewport(v, midUm.x, midUm.y, scaleFactor)
-          const dx = (newMidX - oldMidX) / zoomed.scale
-          const dy = (newMidY - oldMidY) / zoomed.scale
-          return { ...zoomed, left: zoomed.left - dx, top: zoomed.top - dy }
+          if (mode === 'zoom') {
+            // Pinch: zoom only, anchored at midpoint between fingers
+            const midUm = pointerToUm(newMidX, newMidY, v)
+            return zoomViewport(v, midUm.x, midUm.y, scaleFactor)
+          }
+          // Pan (or still undecided — default to pan until we know otherwise)
+          const dx = (newMidX - prevMidX) / v.scale
+          const dy = (newMidY - prevMidY) / v.scale
+          return { ...v, left: v.left - dx, top: v.top - dy }
         })
-        pinchRef.current = { dist: newDist, midX: newMidX, midY: newMidY }
+        pinchRef.current = { dist: newDist, midX: newMidX, midY: newMidY, startDist, startMidX, startMidY, gestureMode: mode }
         return
       }
       if (touches.length === 1 && !pinchRef.current) {
@@ -893,8 +937,10 @@ export default function SampleCanvas({
     (e: KonvaEventObject<TouchEvent>) => {
       if (pinchRef.current) {
         pinchRef.current = null
+        afterTwoFingerRef.current = true  // suppress next single-finger touchstart
         return
       }
+      afterTwoFingerRef.current = false
       const stage = e.target.getStage()
       const pos = stage?.getPointerPosition()
       if (pos) handlePointerUp(pos)
