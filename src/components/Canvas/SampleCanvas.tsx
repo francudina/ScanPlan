@@ -528,6 +528,7 @@ type HoverInfo =
   | { kind: 'vertex'; index: number; px: number; py: number; umX: number; umY: number }
   | { kind: 'edge'; fromIdx: number; toIdx: number; px: number; py: number; length: number }
   | { kind: 'surface'; surfaceIndex: number; px: number; py: number; areaUm2: number }
+  | { kind: 'dot'; px: number; py: number; umX: number; umY: number; pass: number; index: number }
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
@@ -650,6 +651,43 @@ export default function SampleCanvas({
         return
       }
       const um = pointerToUm(pos.x, pos.y, vp)
+
+      // ── Scan dot proximity tooltip ─────────────────────────────────────────
+      // Only active when dots are rendered (same conditions as ScanGridRenderer):
+      // focused pass is hovered, spacing is large enough, and we're not mid-draw.
+      if (
+        scanResult &&
+        hoveredPass !== null &&
+        drawState.mode === 'idle'
+      ) {
+        const pass = scanResult.passes.find((p) => p.pass_number === hoveredPass)
+        if (pass) {
+          const dotSpacePx = Math.min(pass.delta_x, pass.delta_y) * vp.scale
+          if (dotSpacePx >= DOT_SPACING_THRESHOLD) {
+            const DOT_HIT_PX = 8
+            const buf = DOT_HIT_PX / vp.scale
+            const visXMin = vp.left - buf
+            const visXMax = vp.left + size.w / vp.scale + buf
+            const visYMin = vp.top - buf
+            const visYMax = vp.top + size.h / vp.scale + buf
+            let bestDist = DOT_HIT_PX
+            let bestInfo: HoverInfo | null = null
+            for (let idx = 0; idx < pass.grid_points.length; idx++) {
+              const pt = pass.grid_points[idx]
+              if (pt.x < visXMin || pt.x > visXMax || pt.y < visYMin || pt.y > visYMax) continue
+              const dpx = umToPixel(pt.x, vp.left, vp.scale) - pos.x
+              const dpy = umToPixel(pt.y, vp.top, vp.scale) - pos.y
+              const dist = Math.sqrt(dpx * dpx + dpy * dpy)
+              if (dist < bestDist) {
+                bestDist = dist
+                bestInfo = { kind: 'dot', px: pos.x, py: pos.y, umX: pt.x, umY: pt.y, pass: pass.pass_number, index: idx }
+              }
+            }
+            if (bestInfo) { setHoverInfo(bestInfo); return }
+          }
+        }
+      }
+      // ──────────────────────────────────────────────────────────────────────
       if (drawState.mode === 'drawing_rect') {
         const w = um.x - drawState.startX
         const h = um.y - drawState.startY
@@ -707,7 +745,7 @@ export default function SampleCanvas({
         setHoverInfo(null)
       }
     },
-    [drawState, panState, shape, vp],
+    [drawState, hoveredPass, panState, scanResult, shape, size.w, size.h, vp],
   )
 
   const handlePointerUp = useCallback(
@@ -1052,6 +1090,13 @@ export default function SampleCanvas({
             <>
               <div className="font-semibold">Surface:&nbsp;{hoverInfo.surfaceIndex + 1}</div>
               <div className="opacity-80">{fmtAreaDisplay(hoverInfo.areaUm2, displayUnit)}</div>
+            </>
+          )}
+          {hoverInfo.kind === 'dot' && (
+            <>
+              <div className="font-semibold">#{hoverInfo.index + 1}</div>
+              <div className="opacity-80">X:&nbsp;{fmtDisplay(hoverInfo.umX, displayUnit, 2)}</div>
+              <div className="opacity-80">Y:&nbsp;{fmtDisplay(hoverInfo.umY, displayUnit, 2)}</div>
             </>
           )}
         </div>
