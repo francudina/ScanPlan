@@ -76,6 +76,46 @@ function autoGridUnit(spacingUm: number): DisplayUnit {
   return 'nm'
 }
 
+/** Returns the current grid line spacing in µm (same logic as CoordGrid). */
+function calcGridSpacing(vp: Viewport): number {
+  const rawSpacing = 100 / vp.scale
+  const magnitude = Math.pow(10, Math.floor(Math.log10(rawSpacing)))
+  const candidates = [1, 2, 5, 10].map((m) => m * magnitude)
+  return candidates.find((c) => c * vp.scale >= 60) ?? candidates[candidates.length - 1]
+}
+
+/** Snaps a µm coordinate to the nearest grid intersection. */
+function snapToGrid(um: Point, spacing: number): Point {
+  return {
+    x: Math.round(um.x / spacing) * spacing,
+    y: Math.round(um.y / spacing) * spacing,
+  }
+}
+
+/** Pixel distance within which the cursor snaps to a grid crossing. */
+const SNAP_THRESHOLD_PX = 16
+
+/**
+ * Returns the snapped µm point if the cursor is within SNAP_THRESHOLD_PX of a
+ * grid crossing, otherwise returns the raw µm position.
+ * Also returns whether snapping is active so the caller can show the indicator.
+ */
+function resolveSnap(
+  pos: { x: number; y: number },
+  vp: Viewport,
+): { um: Point; snapping: boolean } {
+  const raw = pointerToUm(pos.x, pos.y, vp)
+  const spacing = calcGridSpacing(vp)
+  const snapped = snapToGrid(raw, spacing)
+  const distPx = Math.hypot(
+    umToPixel(snapped.x, vp.left, vp.scale) - pos.x,
+    umToPixel(snapped.y, vp.top, vp.scale) - pos.y,
+  )
+  return distPx < SNAP_THRESHOLD_PX
+    ? { um: snapped, snapping: true }
+    : { um: raw, snapping: false }
+}
+
 function CoordGrid({ vp, width, height, darkMode }: { vp: Viewport; width: number; height: number; darkMode: boolean }) {
   const gridColor = darkMode ? '#2e2e2e' : '#e5e7eb'
   const labelColor = darkMode ? '#555' : '#9ca3af'
@@ -302,7 +342,9 @@ function ScanGridRenderer({
 
   const elements: React.ReactElement[] = []
 
-  scanResult.passes.forEach((pass, passIdx) => {
+  const visiblePasses = scanResult.passes.filter((p) => p.grid_points.length > 0)
+
+  visiblePasses.forEach((pass, passIdx) => {
     const color = PASS_COLORS[passIdx % PASS_COLORS.length]
     const isHovered = focusMode && hoveredPass === pass.pass_number
     const isDimmed = focusMode && hoveredPass !== null && hoveredPass !== pass.pass_number
@@ -346,7 +388,7 @@ function ScanGridRenderer({
         key={`label-${passIdx}`}
         x={toX(pass.region.x_min) + 4}
         y={toY(pass.region.y_min) + 4}
-        text={`Pass ${pass.pass_number}`}
+        text={`Pass ${passIdx + 1}`}
         fontSize={isHovered ? 13 : 11}
         fill={color}
         fontStyle="bold"
@@ -557,6 +599,7 @@ export default function SampleCanvas({
     cx: number; cy: number; r: number
   } | null>(null)
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null)
+  const [snapPoint, setSnapPoint] = useState<Point | null>(null)
 
   // Refs for touch gesture tracking (refs = no stale-closure issues in touch handlers)
   const pinchRef = useRef<{
@@ -646,7 +689,7 @@ export default function SampleCanvas({
         setPanState({ startX: pos.x, startY: pos.y, vpLeft: vp.left, vpTop: vp.top })
         return
       }
-      const um = pointerToUm(pos.x, pos.y, vp)
+      const { um } = resolveSnap(pos, vp)
       if (drawMode === 'rectangle') {
         setDrawState({ mode: 'drawing_rect', startX: um.x, startY: um.y })
         setPreviewRect({ x: um.x, y: um.y, w: 0, h: 0 })
@@ -682,7 +725,10 @@ export default function SampleCanvas({
         setHoverInfo(null)
         return
       }
-      const um = pointerToUm(pos.x, pos.y, vp)
+      const isDrawMode = drawMode !== 'select'
+      const { um, snapping } = isDrawMode ? resolveSnap(pos, vp) : { um: pointerToUm(pos.x, pos.y, vp), snapping: false }
+      const snapped = um
+      setSnapPoint(snapping ? snapped : null)
 
       // ── Scan dot proximity tooltip ─────────────────────────────────────────
       // Only active when dots are rendered (same conditions as ScanGridRenderer):
@@ -721,22 +767,22 @@ export default function SampleCanvas({
       }
       // ──────────────────────────────────────────────────────────────────────
       if (drawState.mode === 'drawing_rect') {
-        const w = um.x - drawState.startX
-        const h = um.y - drawState.startY
+        const w = snapped.x - drawState.startX
+        const h = snapped.y - drawState.startY
         setPreviewRect({
-          x: w >= 0 ? drawState.startX : um.x,
-          y: h >= 0 ? drawState.startY : um.y,
+          x: w >= 0 ? drawState.startX : snapped.x,
+          y: h >= 0 ? drawState.startY : snapped.y,
           w: Math.abs(w),
           h: Math.abs(h),
         })
         setHoverInfo(null)
       } else if (drawState.mode === 'drawing_circle') {
-        const dx = um.x - drawState.cx
-        const dy = um.y - drawState.cy
+        const dx = snapped.x - drawState.cx
+        const dy = snapped.y - drawState.cy
         setPreviewCircle({ cx: drawState.cx, cy: drawState.cy, r: Math.sqrt(dx * dx + dy * dy) })
         setHoverInfo(null)
       } else if (drawState.mode === 'drawing_freeform') {
-        setDrawState({ ...drawState, preview: um })
+        setDrawState({ ...drawState, preview: snapped })
         setHoverInfo(null)
       } else if (shape?.type === 'freeform' && shape.freeform) {
         const pts = shape.freeform.points
@@ -786,7 +832,7 @@ export default function SampleCanvas({
         setPanState(null)
         return
       }
-      const um = pointerToUm(pos.x, pos.y, vp)
+      const { um } = resolveSnap(pos, vp)
       if (drawState.mode === 'drawing_rect') {
         const w = Math.abs(um.x - drawState.startX)
         const h = Math.abs(um.y - drawState.startY)
@@ -980,7 +1026,7 @@ export default function SampleCanvas({
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onDblClick={handleDblClick}
-        onMouseLeave={() => setHoverInfo(null)}
+        onMouseLeave={() => { setHoverInfo(null); setSnapPoint(null) }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -1067,6 +1113,31 @@ export default function SampleCanvas({
             />
           )}
           <DrawingPreview drawState={drawState} vp={vp} />
+
+          {/* Snap-to-grid indicator */}
+          {snapPoint && (
+            <>
+              <Line
+                points={[toX(snapPoint.x) - 10, toY(snapPoint.y), toX(snapPoint.x) + 10, toY(snapPoint.y)]}
+                stroke="#2563eb"
+                strokeWidth={1.5}
+                listening={false}
+              />
+              <Line
+                points={[toX(snapPoint.x), toY(snapPoint.y) - 10, toX(snapPoint.x), toY(snapPoint.y) + 10]}
+                stroke="#2563eb"
+                strokeWidth={1.5}
+                listening={false}
+              />
+              <Circle
+                x={toX(snapPoint.x)}
+                y={toY(snapPoint.y)}
+                radius={3}
+                fill="#2563eb"
+                listening={false}
+              />
+            </>
+          )}
         </Layer>
       </Stage>
 
