@@ -110,11 +110,20 @@ export default function ShapeControls({
     } else if (type === 'circle') {
       onShapeChange({ type, circle: shape?.circle ?? { cx: 0, cy: 0, radius: mmToUm(5) } })
     } else {
+      // Derive 4 corners from rectangle so the user can continue editing as freeform
+      let points = shape?.freeform?.points
+      if (!points && shape?.type === 'rectangle' && shape.rect) {
+        const r = shape.rect
+        points = [
+          { x: r.x,           y: r.y            },
+          { x: r.x + r.width, y: r.y            },
+          { x: r.x + r.width, y: r.y + r.height },
+          { x: r.x,           y: r.y + r.height },
+        ]
+      }
       onShapeChange({
         type: 'freeform',
-        freeform: shape?.freeform ?? {
-          points: [{ x: 0, y: 0 }, { x: mmToUm(10), y: 0 }, { x: mmToUm(10), y: mmToUm(10) }, { x: 0, y: mmToUm(10) }],
-        },
+        freeform: { points: points ?? [{ x: 0, y: 0 }, { x: mmToUm(10), y: 0 }, { x: mmToUm(10), y: mmToUm(10) }, { x: 0, y: mmToUm(10) }] },
       })
     }
     onDrawModeChange('select')

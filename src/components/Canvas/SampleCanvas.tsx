@@ -188,18 +188,84 @@ function ShapeRenderer({
 
   if (shape.type === 'rectangle' && shape.rect) {
     const r = shape.rect
+    const pts: Point[] = [
+      { x: r.x,           y: r.y            },
+      { x: r.x + r.width, y: r.y            },
+      { x: r.x + r.width, y: r.y + r.height },
+      { x: r.x,           y: r.y + r.height },
+    ]
     return (
-      <Rect
-        x={toX(r.x)}
-        y={toY(r.y)}
-        width={r.width * vp.scale}
-        height={r.height * vp.scale}
-        fill="rgba(59,130,246,0.15)"
-        stroke="#2563eb"
-        strokeWidth={2}
-        dash={[6, 3]}
-        listening={false}
-      />
+      <>
+        <Rect
+          x={toX(r.x)}
+          y={toY(r.y)}
+          width={r.width * vp.scale}
+          height={r.height * vp.scale}
+          fill="rgba(59,130,246,0.10)"
+          stroke="#2563eb"
+          strokeWidth={1.5}
+          listening={false}
+        />
+        {/* Segment labels */}
+        {pts.map((p, i) => {
+          const next = pts[(i + 1) % pts.length]
+          const x1 = toX(p.x), y1 = toY(p.y)
+          const x2 = toX(next.x), y2 = toY(next.y)
+          const mx = (x1 + x2) / 2
+          const my = (y1 + y2) / 2
+          const edgeDx = x2 - x1, edgeDy = y2 - y1
+          const edgeLen = Math.sqrt(edgeDx * edgeDx + edgeDy * edgeDy)
+          const nx = edgeLen > 0 ? edgeDx / edgeLen : 1
+          const ny = edgeLen > 0 ? edgeDy / edgeLen : 0
+          let perpX = -ny, perpY = nx
+          if (perpY > 0 || (perpY === 0 && perpX < 0)) { perpX = -perpX; perpY = -perpY }
+          let angle = Math.atan2(edgeDy, edgeDx) * 180 / Math.PI
+          if (angle > 90) angle -= 180
+          else if (angle <= -90) angle += 180
+          const nextIdx = (i + 1) % pts.length
+          const label = `P${i + 1}–P${nextIdx + 1}`
+          const OFFSET = 12
+          const estW = label.length * 5.2
+          return (
+            <Text
+              key={`seg-lbl-${i}`}
+              x={mx + perpX * OFFSET}
+              y={my + perpY * OFFSET}
+              text={label}
+              fontSize={9}
+              fill="#2563eb"
+              opacity={0.7}
+              rotation={angle}
+              offsetX={estW / 2}
+              offsetY={4.5}
+              listening={false}
+            />
+          )
+        })}
+        {/* Vertex dots + labels */}
+        {pts.map((p, i) => (
+          <React.Fragment key={`vtx-${i}`}>
+            <Circle
+              x={toX(p.x)}
+              y={toY(p.y)}
+              radius={i === 0 ? 6 : 5}
+              fill={i === 0 ? '#2563eb' : 'white'}
+              stroke="#2563eb"
+              strokeWidth={2}
+              listening={false}
+            />
+            <Text
+              x={toX(p.x) + 8}
+              y={toY(p.y) - 10}
+              text={`P${i + 1}`}
+              fontSize={11}
+              fontStyle="bold"
+              fill="#1d4ed8"
+              listening={false}
+            />
+          </React.Fragment>
+        ))}
+      </>
     )
   }
 
@@ -210,10 +276,9 @@ function ShapeRenderer({
         x={toX(c.cx)}
         y={toY(c.cy)}
         radius={c.radius * vp.scale}
-        fill="rgba(59,130,246,0.15)"
+        fill="rgba(59,130,246,0.10)"
         stroke="#2563eb"
-        strokeWidth={2}
-        dash={[6, 3]}
+        strokeWidth={1.5}
         listening={false}
       />
     )
@@ -533,13 +598,27 @@ function DrawingPreview({
     if (pts.length === 0) return null
 
     const flatPts = pts.flatMap((p) => [toX(p.x), toY(p.y)])
-    const previewLine =
-      drawState.preview
-        ? [...flatPts, toX(drawState.preview.x), toY(drawState.preview.y)]
-        : flatPts
+
+    // Cursor preview line from last point to mouse
+    const previewLine = drawState.preview
+      ? [...flatPts, toX(drawState.preview.x), toY(drawState.preview.y)]
+      : flatPts
 
     return (
       <>
+        {/* Filled polygon for 3+ points */}
+        {pts.length >= 3 && (
+          <Line
+            points={flatPts}
+            closed
+            fill="rgba(59,130,246,0.10)"
+            stroke="#2563eb"
+            strokeWidth={1.5}
+            listening={false}
+          />
+        )}
+
+        {/* Cursor preview line */}
         <Line
           points={previewLine}
           stroke="#2563eb"
@@ -547,17 +626,67 @@ function DrawingPreview({
           dash={[4, 4]}
           listening={false}
         />
+
+        {/* Segment labels — same as ShapeRenderer */}
+        {pts.map((p, i) => {
+          const next = pts[(i + 1) % pts.length]
+          if (i === pts.length - 1 && pts.length < 3) return null
+          const x1 = toX(p.x), y1 = toY(p.y)
+          const x2 = toX(next.x), y2 = toY(next.y)
+          const mx = (x1 + x2) / 2
+          const my = (y1 + y2) / 2
+          const edgeDx = x2 - x1, edgeDy = y2 - y1
+          const edgeLen = Math.sqrt(edgeDx * edgeDx + edgeDy * edgeDy)
+          const nx = edgeLen > 0 ? edgeDx / edgeLen : 1
+          const ny = edgeLen > 0 ? edgeDy / edgeLen : 0
+          let perpX = -ny, perpY = nx
+          if (perpY > 0 || (perpY === 0 && perpX < 0)) { perpX = -perpX; perpY = -perpY }
+          let angle = Math.atan2(edgeDy, edgeDx) * 180 / Math.PI
+          if (angle > 90) angle -= 180
+          else if (angle <= -90) angle += 180
+          const nextIdx = (i + 1) % pts.length
+          const label = `P${i + 1}–P${nextIdx + 1}`
+          const OFFSET = 12
+          const estW = label.length * 5.2
+          return (
+            <Text
+              key={`seg-lbl-${i}`}
+              x={mx + perpX * OFFSET}
+              y={my + perpY * OFFSET}
+              text={label}
+              fontSize={9}
+              fill="#2563eb"
+              opacity={0.7}
+              rotation={angle}
+              offsetX={estW / 2}
+              offsetY={4.5}
+              listening={false}
+            />
+          )
+        })}
+
+        {/* Vertex dots + P labels — same as ShapeRenderer */}
         {pts.map((p, i) => (
-          <Circle
-            key={i}
-            x={toX(p.x)}
-            y={toY(p.y)}
-            radius={4}
-            fill={i === 0 ? '#2563eb' : 'white'}
-            stroke="#2563eb"
-            strokeWidth={2}
-            listening={false}
-          />
+          <React.Fragment key={`vtx-${i}`}>
+            <Circle
+              x={toX(p.x)}
+              y={toY(p.y)}
+              radius={i === 0 ? 6 : 5}
+              fill={i === 0 ? '#2563eb' : 'white'}
+              stroke="#2563eb"
+              strokeWidth={2}
+              listening={false}
+            />
+            <Text
+              x={toX(p.x) + 8}
+              y={toY(p.y) - 10}
+              text={`P${i + 1}`}
+              fontSize={11}
+              fontStyle="bold"
+              fill="#1d4ed8"
+              listening={false}
+            />
+          </React.Fragment>
         ))}
       </>
     )
@@ -610,6 +739,9 @@ export default function SampleCanvas({
   const lastTapRef = useRef<number>(0)
   // Flag: we just finished a two-finger gesture — ignore the next single-finger pointerdown
   const afterTwoFingerRef = useRef(false)
+  const prevDrawModeRef = useRef<DrawMode>(drawMode)
+  const drawStateRef = useRef(drawState)
+  drawStateRef.current = drawState
 
   // Responsive canvas sizing
   useEffect(() => {
@@ -623,13 +755,80 @@ export default function SampleCanvas({
     return () => obs.disconnect()
   }, [])
 
-  // Fit viewport when shape or scan result changes
+  // Fit viewport when shape or scan result changes (skip while actively drawing points)
   useEffect(() => {
+    if (drawState.mode === 'drawing_freeform') return
     const bbox = shape ? shapeBoundingBox(shape) : null
     if (bbox) {
       setVp(fitViewport(bbox.xMin, bbox.yMin, bbox.xMax, bbox.yMax, size.w, size.h))
     }
-  }, [shape, size.w, size.h])
+  }, [shape, drawState.mode, size.w, size.h])
+
+  // Convert shape when switching between rectangle ↔ freeform draw modes
+  useEffect(() => {
+    const prev = prevDrawModeRef.current
+    prevDrawModeRef.current = drawMode
+    if (prev === drawMode) return
+
+    const ds = drawStateRef.current
+
+    if (drawMode === 'freeform' && shape?.type === 'rectangle' && shape.rect) {
+      // Rectangle → Freeform: immediately commit the 4 corners as a freeform shape so
+      // the sidebar shows freeform controls, then enter drawing state so the user can
+      // click to keep adding more vertices.
+      const r = shape.rect
+      const corners: Point[] = [
+        { x: r.x,           y: r.y            },
+        { x: r.x + r.width, y: r.y            },
+        { x: r.x + r.width, y: r.y + r.height },
+        { x: r.x,           y: r.y + r.height },
+      ]
+      onShapeChange({ type: 'freeform', freeform: { points: corners } })
+      setDrawState({
+        mode: 'drawing_freeform',
+        points: corners,
+        preview: null,
+      })
+    } else if (drawMode === 'rectangle') {
+      // Freeform → Rectangle: prefer in-progress drawing points, else finalized shape
+      let pts: Point[] | null = null
+      if (ds.mode === 'drawing_freeform' && ds.points.length >= 3) {
+        pts = ds.points
+      } else if (shape?.type === 'freeform' && shape.freeform) {
+        pts = shape.freeform.points
+      }
+      setDrawState({ mode: 'idle' })
+      if (pts) {
+        const xs = pts.map((p) => p.x)
+        const ys = pts.map((p) => p.y)
+        const xMin = Math.min(...xs), xMax = Math.max(...xs)
+        const yMin = Math.min(...ys), yMax = Math.max(...ys)
+        onShapeChange({ type: 'rectangle', rect: { x: xMin, y: yMin, width: xMax - xMin, height: yMax - yMin } })
+      }
+    } else if (drawMode === 'freeform' && shape?.type === 'freeform' && shape.freeform) {
+      // Already a committed freeform shape → resume drawing with existing points so
+      // the user can continue adding more vertices.
+      setDrawState({
+        mode: 'drawing_freeform',
+        points: shape.freeform.points,
+        preview: null,
+      })
+    } else {
+      // Any other mode switch: cancel active drawing
+      setDrawState({ mode: 'idle' })
+    }
+  }, [drawMode, shape, onShapeChange])
+
+  // Sync sidebar point edits → drawState while in drawing_freeform mode
+  useEffect(() => {
+    if (shape?.type !== 'freeform' || !shape.freeform) return
+    setDrawState((prev) => {
+      if (prev.mode !== 'drawing_freeform') return prev
+      const newPts = shape.freeform!.points
+      if (prev.points.length === newPts.length && prev.points.every((p, i) => p.x === newPts[i].x && p.y === newPts[i].y)) return prev
+      return { ...prev, points: newPts }
+    })
+  }, [shape])
 
   // ESC cancels active drawing
   useEffect(() => {
@@ -698,7 +897,9 @@ export default function SampleCanvas({
         setPreviewCircle({ cx: um.x, cy: um.y, r: 0 })
       } else if (drawMode === 'freeform') {
         if (drawState.mode !== 'drawing_freeform') {
-          setDrawState({ mode: 'drawing_freeform', points: [um], preview: null })
+          const startPts = [um]
+          onShapeChange({ type: 'freeform', freeform: { points: startPts } })
+          setDrawState({ mode: 'drawing_freeform', points: startPts, preview: null })
         } else {
           const existing = drawState.points
           const first = existing[0]
@@ -708,7 +909,9 @@ export default function SampleCanvas({
             onShapeChange({ type: 'freeform', freeform: { points: existing } })
             setDrawState({ mode: 'idle' })
           } else {
-            setDrawState({ ...drawState, points: [...existing, um] })
+            const newPts = [...existing, um]
+            onShapeChange({ type: 'freeform', freeform: { points: newPts } })
+            setDrawState({ ...drawState, points: newPts })
           }
         }
       }
@@ -816,6 +1019,47 @@ export default function SampleCanvas({
         }
         if (!found && pointInPolygon(um.x, um.y, pts)) {
           setHoverInfo({ kind: 'surface', surfaceIndex: 0, px: pos.x, py: pos.y, areaUm2: polygonAreaUm2(pts) })
+          found = true
+        }
+        if (!found) setHoverInfo(null)
+      } else if (shape?.type === 'rectangle' && shape.rect) {
+        const r = shape.rect
+        const pts: Point[] = [
+          { x: r.x,           y: r.y            },
+          { x: r.x + r.width, y: r.y            },
+          { x: r.x + r.width, y: r.y + r.height },
+          { x: r.x,           y: r.y + r.height },
+        ]
+        const VERTEX_THRESHOLD = 10
+        const EDGE_THRESHOLD = 6
+        let found = false
+        for (let i = 0; i < pts.length; i++) {
+          const vx = umToPixel(pts[i].x, vp.left, vp.scale)
+          const vy = umToPixel(pts[i].y, vp.top, vp.scale)
+          if (Math.sqrt((pos.x - vx) ** 2 + (pos.y - vy) ** 2) < VERTEX_THRESHOLD) {
+            setHoverInfo({ kind: 'vertex', index: i, px: pos.x, py: pos.y, umX: pts[i].x, umY: pts[i].y })
+            found = true
+            break
+          }
+        }
+        if (!found) {
+          for (let i = 0; i < pts.length; i++) {
+            const j = (i + 1) % pts.length
+            const ax = umToPixel(pts[i].x, vp.left, vp.scale)
+            const ay = umToPixel(pts[i].y, vp.top, vp.scale)
+            const bx = umToPixel(pts[j].x, vp.left, vp.scale)
+            const by = umToPixel(pts[j].y, vp.top, vp.scale)
+            if (pointToSegDist(pos.x, pos.y, ax, ay, bx, by) < EDGE_THRESHOLD) {
+              const ddx = pts[j].x - pts[i].x
+              const ddy = pts[j].y - pts[i].y
+              setHoverInfo({ kind: 'edge', fromIdx: i, toIdx: j, px: pos.x, py: pos.y, length: Math.sqrt(ddx * ddx + ddy * ddy) })
+              found = true
+              break
+            }
+          }
+        }
+        if (!found && um.x >= r.x && um.x <= r.x + r.width && um.y >= r.y && um.y <= r.y + r.height) {
+          setHoverInfo({ kind: 'surface', surfaceIndex: 0, px: pos.x, py: pos.y, areaUm2: r.width * r.height })
           found = true
         }
         if (!found) setHoverInfo(null)
@@ -1070,8 +1314,8 @@ export default function SampleCanvas({
 
         {/* Content layer — shapes, grid, drawing */}
         <Layer listening={focusMode}>
-          {/* Sample shape */}
-          {shape && <ShapeRenderer shape={shape} vp={vp} />}
+          {/* Sample shape — hidden while the user is actively editing it as freeform */}
+          {shape && drawState.mode !== 'drawing_freeform' && <ShapeRenderer shape={shape} vp={vp} />}
 
           {/* Scan grid */}
           {scanResult && (
@@ -1118,15 +1362,15 @@ export default function SampleCanvas({
           {snapPoint && (
             <>
               <Line
-                points={[toX(snapPoint.x) - 10, toY(snapPoint.y), toX(snapPoint.x) + 10, toY(snapPoint.y)]}
+                points={[toX(snapPoint.x) - 12, toY(snapPoint.y), toX(snapPoint.x) + 12, toY(snapPoint.y)]}
                 stroke="#2563eb"
-                strokeWidth={1.5}
+                strokeWidth={0.75}
                 listening={false}
               />
               <Line
-                points={[toX(snapPoint.x), toY(snapPoint.y) - 10, toX(snapPoint.x), toY(snapPoint.y) + 10]}
+                points={[toX(snapPoint.x), toY(snapPoint.y) - 12, toX(snapPoint.x), toY(snapPoint.y) + 12]}
                 stroke="#2563eb"
-                strokeWidth={1.5}
+                strokeWidth={0.75}
                 listening={false}
               />
               <Circle
