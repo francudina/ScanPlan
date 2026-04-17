@@ -24,5 +24,7 @@ Live at: [raman.nioquant.com](https://raman.nioquant.com)
 6. **Copy** : export all parameters to clipboard for use in your acquisition software
 
 ## Licence
+Copyright (c) 2026 Nioquant. All rights reserved.
+
 Full licence text: [LICENSE](./LICENSE)
-See also: [nioquant.com/raman](https://nioquant.com/raman/licence)
+See also: [nioquant.com/raman/licence](https://nioquant.com/raman/licence)
