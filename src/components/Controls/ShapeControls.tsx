@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type {
   CircleParams,
   DrawMode,
@@ -100,6 +100,68 @@ export default function ShapeControls({
   const activeShapeType = shape?.type ?? null
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+  const [pointsExpanded, setPointsExpanded] = useState(false)
+  const POINTS_PREVIEW = 4
+  const importRef = useRef<HTMLInputElement>(null)
+
+  const handleExport = () => {
+    if (!shape) return
+    const c = (um: number) => umToDisplay(um, displayUnit)
+    let payload: Record<string, unknown> = { unit: displayUnit, type: shape.type }
+    if (shape.type === 'rectangle' && shape.rect) {
+      const r = shape.rect
+      payload.rect = { x: c(r.x), y: c(r.y), width: c(r.width), height: c(r.height) }
+    } else if (shape.type === 'circle' && shape.circle) {
+      const ci = shape.circle
+      payload.circle = { cx: c(ci.cx), cy: c(ci.cy), radius: c(ci.radius) }
+    } else if (shape.type === 'freeform' && shape.freeform) {
+      payload.freeform = { points: shape.freeform.points.map((p) => ({ x: c(p.x), y: c(p.y) })) }
+    }
+    const now = new Date()
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const datetime =
+      `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}` +
+      `T${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `CustomShape-${datetime}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        const raw = JSON.parse(ev.target?.result as string)
+        const validUnits: DisplayUnit[] = ['nm', 'µm', 'mm', 'cm']
+        const fileUnit: DisplayUnit = validUnits.includes(raw.unit) ? raw.unit : 'µm'
+        const c = (val: number) => displayToUm(val, fileUnit)
+        let imported: SampleShape | null = null
+        if (raw.type === 'rectangle' && raw.rect) {
+          const r = raw.rect
+          imported = { type: 'rectangle', rect: { x: c(r.x), y: c(r.y), width: c(r.width), height: c(r.height) } }
+        } else if (raw.type === 'circle' && raw.circle) {
+          const ci = raw.circle
+          imported = { type: 'circle', circle: { cx: c(ci.cx), cy: c(ci.cy), radius: c(ci.radius) } }
+        } else if (raw.type === 'freeform' && Array.isArray(raw.freeform?.points)) {
+          imported = { type: 'freeform', freeform: { points: raw.freeform.points.map((p: { x: number; y: number }) => ({ x: c(p.x), y: c(p.y) })) } }
+        }
+        if (!imported) { alert('Invalid shape file: missing or unknown shape type.'); return }
+        onShapeChange(imported)
+        analytics.shapeTypeSelected(imported.type)
+      } catch {
+        alert('Failed to parse shape file. Make sure it is a valid CustomShape JSON.')
+      } finally {
+        if (importRef.current) importRef.current.value = ''
+      }
+    }
+    reader.readAsText(file)
+  }
 
   const opts = DISPLAY_UNIT_OPTIONS.find((o) => o.value === displayUnit)!
 
@@ -204,6 +266,33 @@ export default function ShapeControls({
             </Tooltip>
           ))}
         </div>
+        {/* Export / Import — icon only, 2nd row */}
+        <div className="grid grid-cols-2 gap-1 mt-1">
+          <Tooltip text={shape ? 'Export shape to JSON file' : 'No shape to export'} side="top">
+            <button
+              onClick={handleExport}
+              disabled={!shape}
+              className={`w-full flex items-center justify-center py-1.5 rounded border text-xs transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${idleBtn}`}
+            >
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+                <path d="M8 2v8M5 7l3 3 3-3" />
+                <path d="M2 12h12" />
+              </svg>
+            </button>
+          </Tooltip>
+          <Tooltip text="Import shape from JSON file" side="top">
+            <button
+              onClick={() => importRef.current?.click()}
+              className={`w-full flex items-center justify-center py-1.5 rounded border text-xs transition-colors ${idleBtn}`}
+            >
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+                <path d="M8 10V2M5 5l3-3 3 3" />
+                <path d="M2 12h12" />
+              </svg>
+            </button>
+          </Tooltip>
+          <input ref={importRef} type="file" accept=".json" className="hidden" onChange={handleImport} />
+        </div>
       </div>
 
       {/* Rectangle dimensions */}
@@ -279,10 +368,23 @@ export default function ShapeControls({
       {/* Freeform points */}
       {shape?.type === 'freeform' && shape.freeform && (
         <div className="space-y-1.5">
-          <p className={LABEL_CLS}>Polygon Points</p>
+          <div className="flex items-center justify-between">
+            <p className={LABEL_CLS}>Polygon Points <span className="text-gray-400 dark:text-[#555]">({shape.freeform.points.length})</span></p>
+            {shape.freeform.points.length > POINTS_PREVIEW && (
+              <button
+                onClick={() => setPointsExpanded((v) => !v)}
+                className="flex items-center gap-0.5 text-[10px] text-gray-400 hover:text-gray-600 dark:text-[#555] dark:hover:text-[#999] transition-colors"
+              >
+                {pointsExpanded ? 'Collapse' : 'Expand'}
+                <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className={`w-2.5 h-2.5 transition-transform duration-150 ${pointsExpanded ? 'rotate-180' : ''}`}>
+                  <path d="M2 4 L6 8 L10 4" />
+                </svg>
+              </button>
+            )}
+          </div>
 
           <div className="space-y-0.5">
-            {shape.freeform.points.map((p, i) => {
+            {shape.freeform.points.slice(0, pointsExpanded ? undefined : POINTS_PREVIEW).map((p, i) => {
               const pts = shape.freeform!.points
               const isOver = dragOverIndex === i && dragIndex !== i
 
@@ -349,27 +451,66 @@ export default function ShapeControls({
             })}
           </div>
 
-          <Tooltip text="Add a new vertex after the last point" side="right">
+          {shape.freeform.points.length > POINTS_PREVIEW && (
             <button
-              onClick={() => {
-                const pts = shape.freeform!.points
-                const last = pts[pts.length - 1]
-                const newPts = [...pts, { x: last.x + displayToUm(1, displayUnit), y: last.y }]
-                analytics.freeformPointAdded(newPts.length)
-                onShapeChange({ ...shape, freeform: { points: newPts } })
-              }}
-              className="w-full flex items-center justify-center gap-2 px-4 py-1.5 rounded border border-blue-400 text-blue-500 text-xs font-semibold hover:bg-blue-400 hover:text-white transition-colors shadow dark:border-[#4a9eff] dark:text-[#4a9eff] dark:hover:bg-[#4a9eff] dark:hover:text-white"
+              onClick={() => setPointsExpanded((v) => !v)}
+              className="w-full flex items-center justify-center gap-1 py-1 text-[10px] text-gray-400 hover:text-gray-600 dark:text-[#555] dark:hover:text-[#999] border border-dashed border-gray-200 dark:border-[#333] rounded transition-colors"
             >
-              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="w-3 h-3 shrink-0">
-                <path d="M6 2v8M2 6h8" />
-              </svg>
-              Add Point
+              {pointsExpanded ? (
+                <>
+                  <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="w-2.5 h-2.5 rotate-180">
+                    <path d="M2 4 L6 8 L10 4" />
+                  </svg>
+                  Show less
+                </>
+              ) : (
+                <>
+                  <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="w-2.5 h-2.5">
+                    <path d="M2 4 L6 8 L10 4" />
+                  </svg>
+                  Show {shape.freeform.points.length - POINTS_PREVIEW} more
+                </>
+              )}
             </button>
-          </Tooltip>
+          )}
+
+          <div className="grid grid-cols-2 gap-1">
+            <Tooltip text="Add a new vertex after the last point" side="top">
+              <button
+                onClick={() => {
+                  const pts = shape.freeform!.points
+                  const last = pts[pts.length - 1]
+                  const newPts = [...pts, { x: last.x + displayToUm(1, displayUnit), y: last.y }]
+                  analytics.freeformPointAdded(newPts.length)
+                  onShapeChange({ ...shape, freeform: { points: newPts } })
+                }}
+                className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded border border-blue-400 text-blue-500 text-xs font-semibold hover:bg-blue-400 hover:text-white transition-colors shadow dark:border-[#4a9eff] dark:text-[#4a9eff] dark:hover:bg-[#4a9eff] dark:hover:text-white"
+              >
+                <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="w-3 h-3 shrink-0">
+                  <path d="M6 2v8M2 6h8" />
+                </svg>
+                Add Point
+              </button>
+            </Tooltip>
+            <Tooltip text="Remove the current shape and start over" side="top">
+              <button
+                onClick={() => { analytics.shapeCleared(); onClear() }}
+                className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded border border-red-400 text-red-400 text-xs font-semibold hover:bg-red-400 hover:text-white transition-colors shadow dark:border-red-500 dark:text-red-400 dark:hover:bg-red-500 dark:hover:text-white"
+              >
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 shrink-0">
+                  <path d="M2 4h12" />
+                  <path d="M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1" />
+                  <path d="M13 4l-.867 9.143A1 1 0 0 1 11.138 14H4.862a1 1 0 0 1-.995-.857L3 4" />
+                  <path d="M6.5 7v4M9.5 7v4" />
+                </svg>
+                Clear Shape
+              </button>
+            </Tooltip>
+          </div>
         </div>
       )}
 
-      {shape && (
+      {shape && shape.type !== 'freeform' && (
         <Tooltip text="Remove the current shape and start over" side="right">
           <button
             onClick={() => { analytics.shapeCleared(); onClear() }}
