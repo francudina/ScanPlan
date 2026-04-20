@@ -23,10 +23,6 @@ export const analytics = {
     track('scan_copied')
   },
 
-  scanExported(format: string) {
-    track('scan_exported', { format })
-  },
-
   drawModeSelected(mode: string) {
     track('draw_mode_selected', { mode })
   },
@@ -85,5 +81,44 @@ export const analytics = {
 
   licenceClicked() {
     track('licence_clicked')
+  },
+
+  // ── New in v1.1.0 ───────────────────────────────────────────────────────────
+
+  csvExported(pointCount: number, tileCount: number) {
+    track('csv_exported', { point_count: pointCount, tile_count: tileCount })
+  },
+
+  pdfExported(pageCount: number, tileCount: number, hasSnapshot: boolean) {
+    track('pdf_exported', { page_count: pageCount, tile_count: tileCount, has_snapshot: hasSnapshot })
+  },
+
+  exclusionZoneAdded(vertexCount: number, totalZones: number) {
+    track('exclusion_zone_added', { vertex_count: vertexCount, total_zones: totalZones })
+  },
+
+  exclusionZoneRemoved(totalZones: number) {
+    track('exclusion_zone_removed', { total_zones: totalZones })
+  },
+
+  exclusionZonesCleared(clearedCount: number) {
+    track('exclusion_zones_cleared', { cleared_count: clearedCount })
+  },
+
+  rotationOptimizerToggled(enabled: boolean) {
+    track('rotation_optimizer_toggled', { enabled })
+  },
+
+  rotationTabChanged(tab: string, tileSaving: number) {
+    track('rotation_tab_changed', { tab, tile_saving: tileSaving })
+  },
+
+  rotationOptimumFound(angleDeg: number, baselineTiles: number, optimizedTiles: number) {
+    track('rotation_optimum_found', {
+      angle_deg: angleDeg,
+      baseline_tiles: baselineTiles,
+      optimized_tiles: optimizedTiles,
+      tile_saving: baselineTiles - optimizedTiles,
+    })
   },
 }

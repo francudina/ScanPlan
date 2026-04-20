@@ -126,6 +126,18 @@ export default function App() {
   const [rotatedScanResult, setRotatedScanResult] = useState<ScanResult | null>(null)
   const [rotationTab, setRotationTab] = useState<'current' | 'rotated'>('current')
 
+  const handleRotationOptimizerToggle = useCallback((v: boolean) => {
+    analytics.rotationOptimizerToggled(v)
+    setRotationOptimizerEnabled(v)
+  }, [])
+
+  const handleRotationTabChange = useCallback((tab: 'current' | 'rotated') => {
+    const saving = rotatedScanResult && scanResult
+      ? scanResult.passes.length - rotatedScanResult.passes.length : 0
+    analytics.rotationTabChanged(tab, saving)
+    setRotationTab(tab)
+  }, [rotatedScanResult, scanResult])
+
   const [darkMode, setDarkMode] = useState<boolean>(
     () => document.documentElement.classList.contains('dark')
   )
@@ -217,13 +229,21 @@ export default function App() {
   const [exclusionZones, setExclusionZones] = useState<ExclusionZone[]>([])
 
   const handleExclusionZoneAdd = useCallback((points: Point[]) => {
-    setExclusionZones((prev) => [...prev, { id: `ez-${Date.now()}`, points }])
+    setExclusionZones((prev) => {
+      const next = [...prev, { id: `ez-${Date.now()}`, points }]
+      analytics.exclusionZoneAdded(points.length, next.length)
+      return next
+    })
     setScanResult(null)
     setDrawMode('select')
   }, [])
 
   const handleExclusionZoneRemove = useCallback((id: string) => {
-    setExclusionZones((prev) => prev.filter((z) => z.id !== id))
+    setExclusionZones((prev) => {
+      const next = prev.filter((z) => z.id !== id)
+      analytics.exclusionZoneRemoved(next.length)
+      return next
+    })
     setScanResult(null)
   }, [])
 
@@ -275,6 +295,7 @@ export default function App() {
           // Only keep rotated result if it actually reduces tile count
           if (rotated.passes.length < scanResult.passes.length) {
             setRotatedScanResult(rotated)
+            analytics.rotationOptimumFound(optimum.angle_deg, scanResult.passes.length, rotated.passes.length)
           } else {
             setRotatedScanResult(null)
             setRotationTab('current')
@@ -590,7 +611,7 @@ export default function App() {
                 drawMode={drawMode}
                 onDrawModeChange={setDrawMode}
                 onRemove={handleExclusionZoneRemove}
-                onClearAll={() => { setExclusionZones([]); setScanResult(null) }}
+                onClearAll={() => { analytics.exclusionZonesCleared(exclusionZones.length); setExclusionZones([]); setScanResult(null) }}
               />
             </CollapsiblePanel>
 
@@ -715,11 +736,11 @@ export default function App() {
                     hoveredPass={hoveredPass}
                     onPassHover={setHoveredPass}
                     rotationOptimizerEnabled={rotationOptimizerEnabled}
-                    onRotationOptimizerToggle={setRotationOptimizerEnabled}
+                    onRotationOptimizerToggle={handleRotationOptimizerToggle}
                     rotationOptimum={rotationOptimum}
                     rotatedScanResult={rotatedScanResult}
                     activeTab={rotationTab}
-                    onActiveTabChange={setRotationTab}
+                    onActiveTabChange={handleRotationTabChange}
                     getSnapshot={() => snapshotFnRef.current?.() ?? null}
                     shape={shape}
                     scanParams={scanParams}
@@ -761,11 +782,11 @@ export default function App() {
                   hoveredPass={hoveredPass}
                   onPassHover={setHoveredPass}
                   rotationOptimizerEnabled={rotationOptimizerEnabled}
-                  onRotationOptimizerToggle={setRotationOptimizerEnabled}
+                  onRotationOptimizerToggle={handleRotationOptimizerToggle}
                   rotationOptimum={rotationOptimum}
                   rotatedScanResult={rotatedScanResult}
                   activeTab={rotationTab}
-                  onActiveTabChange={setRotationTab}
+                  onActiveTabChange={handleRotationTabChange}
                   getSnapshot={() => snapshotFnRef.current?.() ?? null}
                   shape={shape}
                   scanParams={scanParams}

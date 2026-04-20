@@ -150,6 +150,7 @@ export default function ScanResults({
     a.href = url
     a.click()
     URL.revokeObjectURL(url)
+    analytics.csvExported(src.total_points, src.passes.length)
   }
 
   const handleExportPdf = () => {
@@ -373,6 +374,7 @@ export default function ScanResults({
     const now = new Date()
     const pad = (n: number) => String(n).padStart(2, '0')
     pdf.save(`ScanReport-${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}.pdf`)
+    analytics.pdfExported(pageCount, src.passes.length, !!snapshot)
   }
 
   if (isLoading) {
