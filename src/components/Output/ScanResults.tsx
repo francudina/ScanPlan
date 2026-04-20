@@ -325,15 +325,17 @@ export default function ScanResults({
               className="px-3 pt-2 pb-1.5 flex items-center gap-3 text-xs border-b"
               style={{ borderColor: color + '22', background: color + '08' }}
             >
-              <span className="text-[9px] font-semibold uppercase tracking-wide text-gray-400 dark:text-[#666] shrink-0 w-16">
-                Move stage
+              <span className="text-[9px] font-semibold uppercase tracking-wide text-gray-400 dark:text-[#666] shrink-0 leading-tight">
+                Move<br />stage
               </span>
-              <span className="font-mono font-semibold" style={{ color }}>
-                X = {fmt(pass.start_point.x)}
-              </span>
-              <span className="font-mono font-semibold" style={{ color }}>
-                Y = {fmt(pass.start_point.y)}
-              </span>
+              <div className="grid grid-cols-2 gap-x-3 min-w-0">
+                <span className="font-mono font-semibold whitespace-nowrap" style={{ color }}>
+                  X = {fmt(pass.start_point.x)}
+                </span>
+                <span className="font-mono font-semibold whitespace-nowrap" style={{ color }}>
+                  Y = {fmt(pass.start_point.y)}
+                </span>
+              </div>
             </div>
 
             {/* Scan detail table */}
