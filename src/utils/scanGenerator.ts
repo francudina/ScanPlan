@@ -220,6 +220,71 @@ function insetShape(shape: SampleShape, offsetUm: number): SampleShape {
   return shape
 }
 
+// ── Shape area helpers ─────────────────────────────────────────────────────────
+
+function polygonArea(pts: Point[]): number {
+  return Math.abs(signedArea(pts))
+}
+
+function shapeArea(shape: SampleShape): number {
+  if (shape.type === 'rectangle' && shape.rect) {
+    return shape.rect.width * shape.rect.height
+  }
+  if (shape.type === 'circle' && shape.circle) {
+    return Math.PI * shape.circle.radius ** 2
+  }
+  if (shape.type === 'freeform' && shape.freeform) {
+    return polygonArea(shape.freeform.points)
+  }
+  return 0
+}
+
+// ── Total-mode parameter calculation ──────────────────────────────────────────
+
+export interface TotalModeCalc {
+  nx: number
+  ny: number
+  stepX: number  // µm
+  stepY: number  // µm
+}
+
+/**
+ * Given a target total dot count, compute Nx/Ny and step sizes that will
+ * yield approximately that many points after accounting for inner offset,
+ * shape geometry (not just bounding box), and exclusion zones.
+ */
+export function calcTotalModeParams(
+  shape: SampleShape,
+  targetTotal: number,
+  innerOffsetUm: number,
+  exclusionZones: ExclusionZone[],
+): TotalModeCalc {
+  const effectiveShape = insetShape(shape, innerOffsetUm)
+  const [xMin, yMin, xMax, yMax] = getBoundingBox(effectiveShape)
+  const W = Math.max(1, xMax - xMin)
+  const H = Math.max(1, yMax - yMin)
+
+  // Shape area vs bbox area — correct for circles and freeforms where bbox has empty corners
+  const bboxArea = W * H
+  const sArea = shapeArea(effectiveShape)
+  const exclArea = exclusionZones.reduce((s, z) => s + polygonArea(z.points), 0)
+  const effectiveArea = Math.max(1, sArea - Math.min(exclArea, sArea * 0.99))
+  const bboxFraction = Math.min(1, effectiveArea / bboxArea)
+
+  // Scale up target so that after filtering by shape+exclusions we get ~targetTotal dots
+  const adjustedTarget = Math.max(4, Math.round(targetTotal / Math.max(0.01, bboxFraction)))
+
+  const nx = Math.max(2, Math.round(Math.sqrt(adjustedTarget * W / H)))
+  const ny = Math.max(2, Math.round(Math.sqrt(adjustedTarget * H / W)))
+
+  return {
+    nx,
+    ny,
+    stepX: W / (nx - 1),
+    stepY: H / (ny - 1),
+  }
+}
+
 // ── Public entry point ─────────────────────────────────────────────────────────
 
 export function generateScanGrid(

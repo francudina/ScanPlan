@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { generateScanGrid, getBoundingBox } from './utils/scanGenerator'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { generateScanGrid, calcTotalModeParams } from './utils/scanGenerator'
 import { findOptimalRotation, getRotatedFreeformShape } from './utils/tilingPlanner'
 import SampleCanvas from './components/Canvas/SampleCanvas'
 import ShapeControls from './components/Controls/ShapeControls'
@@ -18,6 +18,7 @@ import type {
   SampleShape,
   ScanParameters,
   ScanResult,
+  SnapshotInfo,
   StageConstraints,
   RotationOptimum,
 } from './types/scan'
@@ -54,9 +55,11 @@ function OffsetInput({ valueUm, displayUnit, onChange }: { valueUm: number; disp
   const fmt = (um: number) => String(umToDisplay(um, displayUnit))
   const [raw, setRaw] = useState(() => fmt(valueUm))
   const prev = useRef(valueUm)
+  const prevUnit = useRef(displayUnit)
   useEffect(() => {
-    if (valueUm !== prev.current) {
+    if (valueUm !== prev.current || displayUnit !== prevUnit.current) {
       prev.current = valueUm
+      prevUnit.current = displayUnit
       setRaw(fmt(valueUm))
     }
   }, [valueUm, displayUnit])
@@ -286,6 +289,21 @@ export default function App() {
   const [frameSegments, setFrameSegments] = useState<FrameSegment[]>([])
   const [innerOffsetUm, setInnerOffsetUm] = useState(0)
 
+  // Live calculation for Total mode — accounts for inner offset, shape geometry, exclusion zones
+  const totalModeCalc = useMemo(() => {
+    if (!shape || scanInputMode !== 'total') return null
+    try { return calcTotalModeParams(shape, targetTotal, innerOffsetUm, exclusionZones) }
+    catch { return null }
+  }, [shape, scanInputMode, targetTotal, innerOffsetUm, exclusionZones])
+
+  // Sync Total mode results back into step/grid state so other tabs reflect the values
+  useEffect(() => {
+    if (!totalModeCalc) return
+    setScanParams((p) => ({ ...p, step_x: totalModeCalc.stepX, step_y: totalModeCalc.stepY }))
+    setTargetNx(totalModeCalc.nx)
+    setTargetNy(totalModeCalc.ny)
+  }, [totalModeCalc])
+
   const handleExclusionZoneAdd = useCallback((points: Point[]) => {
     setExclusionZones((prev) => {
       const next = [...prev, { id: `ez-${Date.now()}`, points }]
@@ -305,8 +323,8 @@ export default function App() {
     setScanResult(null)
   }, [])
 
-  const snapshotFnRef = useRef<(() => string | null) | null>(null)
-  const handleRegisterSnapshot = useCallback((fn: () => string | null) => {
+  const snapshotFnRef = useRef<(() => SnapshotInfo | null) | null>(null)
+  const handleRegisterSnapshot = useCallback((fn: () => SnapshotInfo | null) => {
     snapshotFnRef.current = fn
   }, [])
 
@@ -421,16 +439,8 @@ export default function App() {
           step_y: ny > 1 ? stage.max_scan_height / (ny - 1) : stage.max_scan_height,
         }
       } else if (scanInputMode === 'total') {
-        const [xMin, yMin, xMax, yMax] = getBoundingBox(shape)
-        const W = Math.max(1, xMax - xMin)
-        const H = Math.max(1, yMax - yMin)
-        const Nx = Math.max(2, Math.round(Math.sqrt(targetTotal * W / H)))
-        const Ny = Math.max(2, Math.round(Math.sqrt(targetTotal * H / W)))
-        params = {
-          ...scanParams,
-          step_x: W / (Nx - 1),
-          step_y: H / (Ny - 1),
-        }
+        const calc = calcTotalModeParams(shape, targetTotal, innerOffsetUm, exclusionZones)
+        params = { ...scanParams, step_x: calc.stepX, step_y: calc.stepY }
       }
       const result = generateScanGrid(shape, params, stage, exclusionZones, innerOffsetUm)
       setScanResult(result)

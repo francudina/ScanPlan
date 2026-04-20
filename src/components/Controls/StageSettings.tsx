@@ -4,12 +4,9 @@ import {
   type DisplayUnit,
   DISPLAY_UNIT_OPTIONS,
   displayToUm,
-  fmtDisplay,
-  mmToUm,
   umToDisplay,
 } from '../../utils/units'
 import Tooltip from '../UI/Tooltip'
-import { analytics } from '../../utils/analytics'
 
 interface Props {
   constraints: StageConstraints
@@ -143,33 +140,6 @@ export default function StageSettings({ constraints, displayUnit, onChange }: Pr
         </div>
       </Tooltip>
 
-      {/* Stage presets */}
-      <div className="flex flex-col gap-0.5">
-        <span className={LABEL_CLS}>Stage Presets</span>
-        <select
-          className="w-full bg-white border border-gray-200 rounded px-2 py-1 text-xs text-gray-700 font-mono cursor-pointer
-            focus:outline-none focus:border-blue-400 transition-colors
-            dark:bg-[#2c2c2c] dark:border-[#3a3a3a] dark:text-[#d4d4d4] dark:focus:border-[#4a9eff]"
-          value=""
-          onChange={(e) => {
-            const [w, h] = e.target.value.split(',').map(Number)
-            if (!isNaN(w)) {
-              set({ max_scan_width: w, max_scan_height: h })
-              analytics.stagePresetApplied(w / 1000, h / 1000)
-            }
-          }}
-        >
-          <option value="" disabled>Select stage size…</option>
-          {[
-            { wUm: mmToUm(25), hUm: mmToUm(25) },
-            { wUm: mmToUm(50), hUm: mmToUm(50) },
-          ].map(({ wUm, hUm }) => (
-            <option key={wUm} value={`${wUm},${hUm}`}>
-              {fmtDisplay(wUm, displayUnit, 0)} × {fmtDisplay(hUm, displayUnit, 0)}
-            </option>
-          ))}
-        </select>
-      </div>
     </section>
   )
 }

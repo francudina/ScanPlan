@@ -20,6 +20,7 @@ import type {
   RotationOptimum,
   SampleShape,
   ScanResult,
+  SnapshotInfo,
   Viewport,
 } from '../../types/scan'
 import {
@@ -77,7 +78,7 @@ interface Props {
   rotatedScanResult?: ScanResult | null
   exclusionZones: ExclusionZone[]
   onExclusionZoneAdd: (points: Point[]) => void
-  onRegisterSnapshot: (fn: () => string | null) => void
+  onRegisterSnapshot: (fn: () => SnapshotInfo | null) => void
   frameEnabled?: boolean
   frameSegments?: FrameSegment[]
 }
@@ -269,8 +270,8 @@ function ShapeRenderer({
             <Circle
               x={toX(p.x)}
               y={toY(p.y)}
-              radius={i === 0 ? 6 : 5}
-              fill={i === 0 ? '#2563eb' : 'white'}
+              radius={5}
+              fill="white"
               stroke="#2563eb"
               strokeWidth={2}
               listening={false}
@@ -368,8 +369,8 @@ function ShapeRenderer({
             <Circle
               x={toX(p.x)}
               y={toY(p.y)}
-              radius={i === 0 ? 6 : 5}
-              fill={i === 0 ? '#2563eb' : 'white'}
+              radius={5}
+              fill="white"
               stroke="#2563eb"
               strokeWidth={2}
               listening={false}
@@ -877,7 +878,6 @@ function DrawingPreview({
         {/* Vertex dots + P labels — same as ShapeRenderer */}
         {pts.map((p, i) => {
           const isAnchor = anchorIdx === i
-          const isFirst  = i === 0
           return (
             <React.Fragment key={`vtx-${i}`}>
               {/* Anchor pulse ring */}
@@ -896,8 +896,8 @@ function DrawingPreview({
               <Circle
                 x={toX(p.x)}
                 y={toY(p.y)}
-                radius={isFirst ? 6 : 5}
-                fill={isAnchor ? '#f59e0b' : isFirst ? '#2563eb' : 'white'}
+                radius={isAnchor ? 6 : 5}
+                fill={isAnchor ? '#f59e0b' : 'white'}
                 stroke={isAnchor ? '#f59e0b' : '#2563eb'}
                 strokeWidth={2}
                 listening={false}
@@ -943,8 +943,8 @@ function DrawingPreview({
         )}
         {pts.map((p, i) => (
           <React.Fragment key={i}>
-            <Circle x={toX(p.x)} y={toY(p.y)} radius={i === 0 ? 6 : 4}
-              fill={i === 0 ? '#ef4444' : '#fca5a5'} stroke="#ef4444" strokeWidth={1.5} listening={false} />
+            <Circle x={toX(p.x)} y={toY(p.y)} radius={4}
+              fill="#fca5a5" stroke="#ef4444" strokeWidth={1.5} listening={false} />
           </React.Fragment>
         ))}
       </>
@@ -1011,10 +1011,18 @@ export default function SampleCanvas({
   const prevDrawModeRef = useRef<DrawMode>(drawMode)
   const drawStateRef = useRef(drawState)
   drawStateRef.current = drawState
+  const vpRef = useRef(vp)
+  vpRef.current = vp
+  const sizeRef = useRef(size)
+  sizeRef.current = size
 
   // Register snapshot function for PDF export
   useEffect(() => {
-    onRegisterSnapshot(() => stageRef.current?.toDataURL({ pixelRatio: 2 }) ?? null)
+    onRegisterSnapshot(() => {
+      const dataURL = stageRef.current?.toDataURL({ pixelRatio: 2 }) ?? null
+      if (!dataURL) return null
+      return { dataURL, vp: vpRef.current, canvasW: sizeRef.current.w, canvasH: sizeRef.current.h }
+    })
   }, [onRegisterSnapshot])
 
   // Responsive canvas sizing

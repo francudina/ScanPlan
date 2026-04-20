@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import jsPDF from 'jspdf'
-import type { RotationOptimum, SampleShape, ScanParameters, ScanPass, ScanResult, StageConstraints } from '../../types/scan'
+import type { RotationOptimum, SampleShape, ScanParameters, ScanPass, ScanResult, SnapshotInfo, StageConstraints } from '../../types/scan'
 import {
   type DisplayUnit,
   DISPLAY_UNIT_OPTIONS,
@@ -27,7 +27,7 @@ interface Props {
   rotatedScanResult?: ScanResult | null
   activeTab?: 'current' | 'rotated'
   onActiveTabChange?: (tab: 'current' | 'rotated') => void
-  getSnapshot?: () => string | null
+  getSnapshot?: () => SnapshotInfo | null
   shape?: SampleShape | null
   scanParams?: ScanParameters
   stage?: StageConstraints
@@ -185,14 +185,32 @@ export default function ScanResults({
     if (snapshot) {
       try {
         const imgProps = (pdf as unknown as { getImageProperties: (s: string) => { width: number; height: number } })
-          .getImageProperties(snapshot)
+          .getImageProperties(snapshot.dataURL)
         const ratio = imgProps.height / imgProps.width
         const maxH = 110  // mm — cap so config still fits on page 1
         let imgW = contentW
         let imgH = imgW * ratio
         if (imgH > maxH) { imgH = maxH; imgW = imgH / ratio }
         const imgX = margin + (contentW - imgW) / 2
-        pdf.addImage(snapshot, 'PNG', imgX, y, imgW, imgH)
+        pdf.addImage(snapshot.dataURL, 'PNG', imgX, y, imgW, imgH)
+
+        // Draw scan dots on top of the snapshot using jsPDF circles
+        const { vp, canvasW, canvasH } = snapshot
+        const DOT_R = 0.35  // dot radius in mm on the PDF
+        src.passes.forEach((pass) => {
+          for (const pt of pass.grid_points) {
+            const cx = (pt.x - vp.left) * vp.scale / canvasW
+            const cy = (pt.y - vp.top)  * vp.scale / canvasH
+            if (cx < 0 || cx > 1 || cy < 0 || cy > 1) continue
+            const px = imgX + cx * imgW
+            const py = y    + cy * imgH
+            pdf.setFillColor(250, 204, 21)    // yellow fill
+            pdf.setDrawColor(146, 64, 14)     // amber stroke
+            pdf.setLineWidth(0.1)
+            pdf.circle(px, py, DOT_R, 'FD')
+          }
+        })
+
         y += imgH + 7
       } catch { /* skip if snapshot fails */ }
     }

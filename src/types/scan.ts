@@ -100,6 +100,13 @@ export interface Viewport {
   scale: number // pixels per micron
 }
 
+export interface SnapshotInfo {
+  dataURL: string
+  vp: Viewport
+  canvasW: number
+  canvasH: number
+}
+
 export type DrawState =
   | { mode: 'idle' }
   | { mode: 'drawing_rect'; startX: number; startY: number }

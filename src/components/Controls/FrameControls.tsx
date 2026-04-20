@@ -23,9 +23,11 @@ function WidthInput({ value, onChange, displayUnit }: { value: number; onChange:
   const fmt = (um: number) => String(umToDisplay(um, displayUnit))
   const [raw, setRaw] = useState(() => fmt(value))
   const prev = useRef(value)
+  const prevUnit = useRef(displayUnit)
   useEffect(() => {
-    if (value !== prev.current) {
+    if (value !== prev.current || displayUnit !== prevUnit.current) {
       prev.current = value
+      prevUnit.current = displayUnit
       setRaw(fmt(value))
     }
   }, [value, displayUnit])

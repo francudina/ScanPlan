@@ -73,7 +73,7 @@ function NumericInput({
   )
 }
 
-const PRESETS_UM = [1, 5, 10, 25, 50, 100, 500, 1000]
+
 
 export default function ScanParamsForm({
   params, displayUnit, onChange,
@@ -163,7 +163,7 @@ export default function ScanParamsForm({
         </Tooltip>
       ) : inputMode === 'total' ? (
         /* ── Total dots mode ───────────────────────────────────────────────── */
-        <Tooltip text="Enter total number of scan points. Grid dimensions (Nx × Ny) are calculated from shape aspect ratio." side="right">
+        <Tooltip text="Enter total number of scan points. Grid and step sizes are calculated from shape geometry, inner offset, and exclusion zones, and reflected in the other tabs." side="right">
           <div className="space-y-0.5">
             <span className={LABEL_CLS}>Total Dots</span>
             <div className={ROW_CLS + ' w-full'}>
@@ -175,9 +175,6 @@ export default function ScanParamsForm({
               />
               <span className={AXIS_CLS + ' w-10 text-right shrink-0'}>dots</span>
             </div>
-            <p className="text-[10px] text-gray-400 dark:text-[#555] px-1 pt-0.5 leading-relaxed">
-              Grid is auto-calculated from shape aspect ratio at generate time.
-            </p>
           </div>
         </Tooltip>
       ) : null}
@@ -207,29 +204,6 @@ export default function ScanParamsForm({
         )}
       </div>
 
-      {/* Quick presets — only in step mode */}
-      {inputMode === 'step' && (
-        <div className="flex flex-col gap-0.5">
-          <span className={LABEL_CLS}>Quick Presets</span>
-          <select
-            className="w-full bg-white border border-gray-200 rounded px-2 py-1 text-xs text-gray-700 font-mono cursor-pointer
-              focus:outline-none focus:border-blue-400 transition-colors
-              dark:bg-[#2c2c2c] dark:border-[#3a3a3a] dark:text-[#d4d4d4] dark:focus:border-[#4a9eff]"
-            value=""
-            onChange={(e) => {
-              const um = parseFloat(e.target.value)
-              if (!isNaN(um)) set({ step_x: um, step_y: um })
-            }}
-          >
-            <option value="" disabled>Select step size…</option>
-            {PRESETS_UM.map((um) => (
-              <option key={um} value={um}>
-                {fmtDisplay(um, displayUnit, opts.decimals)}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
     </section>
   )
 }
