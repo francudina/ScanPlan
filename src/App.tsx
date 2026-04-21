@@ -491,7 +491,7 @@ export default function App() {
             </svg>
           </div>
           <div className="hidden sm:block min-w-0">
-            <h1 className="text-base font-bold text-gray-900 dark:text-[#e0e0e0] truncate">Raman Sample Analyzer <span className="text-[10px] font-normal text-gray-400 dark:text-[#666]">v1.1.0</span></h1>
+            <h1 className="text-base font-bold text-gray-900 dark:text-[#e0e0e0] truncate">ScanPlan <span className="text-[10px] font-normal text-gray-400 dark:text-[#666]">v1.1.0</span></h1>
             <a href="https://nioquant.com/" target="_blank" rel="noopener noreferrer" className="hidden md:block text-[10px] text-gray-400 dark:text-[#666] hover:text-[#4a9eff] dark:hover:text-[#4a9eff] transition-colors">by nioquant</a>
           </div>
         </div>
@@ -808,7 +808,7 @@ export default function App() {
           <div className={`shrink-0 px-3 py-2 border-t border-gray-200 dark:border-[#2e2e2e]${sidebarCollapsed ? ' md:hidden' : ''}`}>
             <p className="text-[9px] text-gray-400 dark:text-[#555] text-center">
               <a
-                href="https://nioquant.com/raman/licence"
+                href="https://nioquant.com/scanplan/licence"
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => analytics.licenceClicked()}
@@ -979,8 +979,8 @@ export default function App() {
             {/* Content */}
             <div className="px-4 py-4 space-y-4 text-sm text-gray-600 dark:text-[#b0b0b0] leading-relaxed">
               <div>
-                <p className="font-semibold text-gray-800 dark:text-[#e0e0e0] mb-1">What is Raman Sample Analyzer?</p>
-                <p>A tool for planning Raman microscopy scan grids. Define your sample shape on the canvas, configure scan parameters, and generate an optimised point grid, before touching the instrument.</p>
+                <p className="font-semibold text-gray-800 dark:text-[#e0e0e0] mb-1">What is ScanPlan?</p>
+                <p>A browser-based tool for planning microscope scan grids across Raman, confocal, XRF, EBSD, SEM-EDS, AFM, SIMS, EPMA, and TERS instruments. Define your sample shape on the canvas, configure scan parameters, and generate an optimised point grid before touching the instrument.</p>
               </div>
 
               <div className="space-y-2">
