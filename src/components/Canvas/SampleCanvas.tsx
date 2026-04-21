@@ -5,6 +5,7 @@ import {
   Group,
   Layer,
   Line,
+  Path,
   Rect,
   Stage,
   Text,
@@ -827,38 +828,120 @@ function FrameRenderer({
   if (shape.type === 'freeform' && shape.freeform) {
     const pts = shape.freeform.points
     const n = pts.length
+
+    // Pre-compute each edge's outward normal (pixel space, unit length)
+    const edgeNormals: { nx: number; ny: number }[] = pts.map((p0, i) => {
+      const p1 = pts[(i + 1) % n]
+      const dx = toX(p1.x) - toX(p0.x), dy = toY(p1.y) - toY(p0.y)
+      const len = Math.sqrt(dx * dx + dy * dy)
+      if (len < 0.01) return { nx: 0, ny: 0 }
+      return { nx: -dy / len, ny: dx / len }
+    })
+
+    const strips = segments.map((seg, i) => {
+      const color = FRAME_COLORS[i % FRAME_COLORS.length]
+      const w = px(seg.widthUm)
+      if (w < 0.5) return null
+      const p0 = pts[i], p1 = pts[(i + 1) % n]
+      const x0 = toX(p0.x), y0 = toY(p0.y)
+      const x1 = toX(p1.x), y1 = toY(p1.y)
+      const { nx, ny } = edgeNormals[i]
+      const ox = nx * w / 2, oy = ny * w / 2
+      // Label sits just beyond the outer edge of the strip (w + 6 px),
+      // with a 20 px minimum so it always clears the P1–P2 shape labels at 14 px.
+      const labelOut = Math.max(20, w + 6)
+      const midX = (x0 + x1) / 2 + nx * labelOut
+      const midY = (y0 + y1) / 2 + ny * labelOut
+      return (
+        <React.Fragment key={seg.id}>
+          <Line
+            points={[x0 + ox, y0 + oy, x1 + ox, y1 + oy]}
+            stroke={color} strokeWidth={w} opacity={0.25}
+            lineCap="butt" listening={false}
+          />
+          <Text x={midX - 8} y={midY - 6} text={seg.label} fontSize={10} fontStyle="bold" fill={color} listening={false} />
+        </React.Fragment>
+      )
+    })
+
+    // Corner fills — cubic Bézier bridging the two outer strip endpoints at each vertex.
+    // Control points sit along each tangent at a tension fraction of |AB| so the
+    // curve is always bounded near the vertex regardless of corner angle.
+    const corners = pts.map((_, i) => {
+      const prevIdx = (i - 1 + n) % n
+      const segIn  = segments[prevIdx]
+      const segOut = segments[i < segments.length ? i : 0]
+      if (!segIn || !segOut) return null
+
+      const wIn  = px(segIn.widthUm)
+      const wOut = px(segOut.widthUm)
+      if (Math.max(wIn, wOut) < 0.5) return null
+
+      const p1x = toX(pts[i].x),           p1y = toY(pts[i].y)
+      const p0x = toX(pts[prevIdx].x),      p0y = toY(pts[prevIdx].y)
+      const p2x = toX(pts[(i+1)%n].x),      p2y = toY(pts[(i+1)%n].y)
+
+      const dxIn = p1x - p0x, dyIn = p1y - p0y
+      const lenIn = Math.sqrt(dxIn * dxIn + dyIn * dyIn)
+      const dxOut = p2x - p1x, dyOut = p2y - p1y
+      const lenOut = Math.sqrt(dxOut * dxOut + dyOut * dyOut)
+      if (lenIn < 1 || lenOut < 1) return null
+
+      const nxIn  = -dyIn  / lenIn,  nyIn  = dxIn  / lenIn
+      const nxOut = -dyOut / lenOut, nyOut = dxOut / lenOut
+
+      // A and B: the exact outer corners the curve must connect
+      const ax = p1x + nxIn  * wIn,  ay = p1y + nyIn  * wIn
+      const bx = p1x + nxOut * wOut, by = p1y + nyOut * wOut
+
+      // Convexity: midpoint of A–B must be on the exterior (bisector) side
+      const bisX = nxIn + nxOut, bisY = nyIn + nyOut
+      const midABx = (ax + bx) / 2, midABy = (ay + by) / 2
+      if ((midABx - p1x) * bisX + (midABy - p1y) * bisY <= 0) return null
+
+      const abDist = Math.sqrt((bx - ax) ** 2 + (by - ay) ** 2)
+      if (abDist < 0.5) return null
+
+      // Edge unit directions
+      const exIn  = dxIn  / lenIn,  eyIn  = dyIn  / lenIn
+      const exOut = dxOut / lenOut, eyOut = dyOut / lenOut
+
+      // Cubic Bézier: C1 leaves A along incoming tangent, C2 arrives at B from reversed outgoing tangent
+      const tension = 0.4 * abDist
+      const c1x = ax + exIn  * tension, c1y = ay + eyIn  * tension
+      const c2x = bx - exOut * tension, c2y = by - eyOut * tension
+
+      // De Casteljau split at t = 0.5 so each half gets its segment's colour
+      const m1x = (ax  + c1x) / 2, m1y = (ay  + c1y) / 2
+      const m2x = (c1x + c2x) / 2, m2y = (c1y + c2y) / 2
+      const m3x = (c2x + bx)  / 2, m3y = (c2y + by)  / 2
+      const m4x = (m1x + m2x) / 2, m4y = (m1y + m2y) / 2
+      const m5x = (m2x + m3x) / 2, m5y = (m2y + m3y) / 2
+      const midx = (m4x + m5x) / 2, midy = (m4y + m5y) / 2
+
+      const colorIn  = FRAME_COLORS[prevIdx % FRAME_COLORS.length]
+      const colorOut = FRAME_COLORS[i       % FRAME_COLORS.length]
+
+      return (
+        <React.Fragment key={`corner-${i}`}>
+          {/* Incoming-segment half: vertex → A → curve to midpoint */}
+          <Path
+            data={`M ${p1x} ${p1y} L ${ax} ${ay} C ${m1x} ${m1y} ${m4x} ${m4y} ${midx} ${midy} Z`}
+            fill={colorIn} opacity={0.25} listening={false}
+          />
+          {/* Outgoing-segment half: vertex → midpoint → curve to B */}
+          <Path
+            data={`M ${p1x} ${p1y} L ${midx} ${midy} C ${m5x} ${m5y} ${m3x} ${m3y} ${bx} ${by} Z`}
+            fill={colorOut} opacity={0.25} listening={false}
+          />
+        </React.Fragment>
+      )
+    })
+
     return (
       <Group listening={false}>
-        {segments.map((seg, i) => {
-          const color = FRAME_COLORS[i % FRAME_COLORS.length]
-          const w = px(seg.widthUm)
-          if (w < 0.5) return null
-          const p0 = pts[i], p1 = pts[(i + 1) % n]
-          const x0 = toX(p0.x), y0 = toY(p0.y)
-          const x1 = toX(p1.x), y1 = toY(p1.y)
-          const dx = x1 - x0, dy = y1 - y0
-          const len = Math.sqrt(dx * dx + dy * dy)
-          if (len < 1) return null
-          const nx = -dy / len, ny = dx / len
-          const ox = nx * w, oy = ny * w
-          const midX = (x0 + x1) / 2 + ox * 0.5 + nx * 8
-          const midY = (y0 + y1) / 2 + oy * 0.5 + ny * 8
-          return (
-            <React.Fragment key={seg.id}>
-              <Line
-                points={[x0 + ox, y0 + oy, x1 + ox, y1 + oy]}
-                stroke={color} strokeWidth={w} opacity={0.25}
-                lineCap="butt" listening={false}
-              />
-              <Line
-                points={[x0 + ox, y0 + oy, x1 + ox, y1 + oy]}
-                stroke={color} strokeWidth={1} opacity={0.8}
-                lineCap="butt" listening={false}
-              />
-              <Text x={midX - 8} y={midY - 6} text={seg.label} fontSize={10} fontStyle="bold" fill={color} listening={false} />
-            </React.Fragment>
-          )
-        })}
+        {strips}
+        {corners}
       </Group>
     )
   }

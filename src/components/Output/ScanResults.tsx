@@ -429,7 +429,7 @@ export default function ScanResults({
       {/* Header */}
       <div className="flex items-center justify-between gap-1">
         <h3 className="text-[10px] font-semibold uppercase tracking-widest text-gray-500 dark:text-[#888]">Scan Parameters</h3>
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-1 shrink-0 pr-1">
           <button
             onClick={handleCopy}
             className="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#3a3a3a] text-gray-500 dark:text-[#888] hover:border-blue-400 hover:text-blue-500 dark:hover:border-[#4a9eff] dark:hover:text-[#4a9eff] transition-colors"

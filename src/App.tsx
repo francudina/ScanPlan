@@ -396,7 +396,7 @@ export default function App() {
   // Derive frame segments from shape
   useEffect(() => {
     if (!shape) { setFrameSegments([]); return }
-    const DEFAULT_W = 1000 // 1 mm default frame width
+    const DEFAULT_W = 0
     const makeSegments = (sides: string[]): FrameSegment[] =>
       sides.map((side, i) => {
         const label = `F${i + 1}`
@@ -746,6 +746,17 @@ export default function App() {
                     <OffsetInput valueUm={innerOffsetUm} displayUnit={displayUnit} onChange={setInnerOffsetUm} />
                   </Tooltip>
                   <span className="text-[10px] text-gray-400 dark:text-[#555]">{displayUnit}</span>
+                  <Tooltip text="Reset">
+                    <button
+                      onClick={() => setInnerOffsetUm(0)}
+                      className="text-gray-300 dark:text-[#444] hover:text-gray-500 dark:hover:text-[#888] transition-colors shrink-0"
+                    >
+                      <svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor">
+                        <path d="M8 2.5a5.5 5.5 0 1 0 5.03 3.25.75.75 0 0 1 1.37-.6A7 7 0 1 1 8 1v1.5z"/>
+                        <path d="M8 5.5V.5a.35.35 0 0 1 .574-.27l3 2.5a.35.35 0 0 1 0 .54l-3 2.5A.35.35 0 0 1 8 5.5z"/>
+                      </svg>
+                    </button>
+                  </Tooltip>
                 </div>
               </div>
             </CollapsiblePanel>

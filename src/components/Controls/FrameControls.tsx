@@ -80,22 +80,33 @@ export default function FrameControls({ enabled, onToggle, segments, onSegmentWi
             Width of each frame segment drawn outside the shape edge.
           </p>
           {segments.map((seg, i) => (
-            <Tooltip key={seg.id} text={`Width of frame segment ${seg.label}`} side="right">
-              <div className="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-gray-50 dark:hover:bg-[#252525]">
-                <span
-                  className="text-[10px] font-mono font-bold w-6 shrink-0"
-                  style={{ color: FRAME_COLORS[i % FRAME_COLORS.length] }}
-                >
-                  {seg.label}
-                </span>
+            <div key={seg.id} className="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-gray-50 dark:hover:bg-[#252525]">
+              <span
+                className="text-[10px] font-mono font-bold w-6 shrink-0"
+                style={{ color: FRAME_COLORS[i % FRAME_COLORS.length] }}
+              >
+                {seg.label}
+              </span>
+              <Tooltip text={`Width of frame segment ${seg.label}`} side="right">
                 <WidthInput
                   value={seg.widthUm}
                   onChange={(v) => onSegmentWidthChange(seg.id, v)}
                   displayUnit={displayUnit}
                 />
-                <span className="text-[10px] text-gray-400 dark:text-[#555]">{displayUnit}</span>
-              </div>
-            </Tooltip>
+              </Tooltip>
+              <span className="text-[10px] text-gray-400 dark:text-[#555]">{displayUnit}</span>
+              <Tooltip text="Reset" side="right">
+                <button
+                  onClick={() => onSegmentWidthChange(seg.id, 0)}
+                  className="text-gray-300 dark:text-[#444] hover:text-gray-500 dark:hover:text-[#888] transition-colors shrink-0"
+                >
+                  <svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor">
+                    <path d="M8 2.5a5.5 5.5 0 1 0 5.03 3.25.75.75 0 0 1 1.37-.6A7 7 0 1 1 8 1v1.5z"/>
+                    <path d="M8 5.5V.5a.35.35 0 0 1 .574-.27l3 2.5a.35.35 0 0 1 0 .54l-3 2.5A.35.35 0 0 1 8 5.5z"/>
+                  </svg>
+                </button>
+              </Tooltip>
+            </div>
           ))}
         </div>
       )}
