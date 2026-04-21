@@ -109,28 +109,125 @@ function snapToGrid(um: Point, spacing: number): Point {
   }
 }
 
-/** Pixel distance within which the cursor snaps to a grid crossing. */
+/** Pixel distance within which the cursor snaps to a grid crossing or shape feature. */
 const SNAP_THRESHOLD_PX = 16
 
+/** Collect all line-segment edges of a shape as [start, end] µm pairs. */
+function getShapeEdges(shape: SampleShape | null | undefined): [Point, Point][] {
+  if (!shape) return []
+  if (shape.type === 'rectangle' && shape.rect) {
+    const r = shape.rect
+    const pts: Point[] = [
+      { x: r.x,           y: r.y            },
+      { x: r.x + r.width, y: r.y            },
+      { x: r.x + r.width, y: r.y + r.height },
+      { x: r.x,           y: r.y + r.height },
+    ]
+    return pts.map((p, i) => [p, pts[(i + 1) % pts.length]] as [Point, Point])
+  }
+  if (shape.type === 'freeform' && shape.freeform && shape.freeform.points.length >= 2) {
+    const pts = shape.freeform.points
+    return pts.map((p, i) => [p, pts[(i + 1) % pts.length]] as [Point, Point])
+  }
+  return []
+}
+
+/** Closest point (µm) on segment [a→b] to point p. */
+function closestPointOnSegment(p: Point, a: Point, b: Point): Point {
+  const dx = b.x - a.x, dy = b.y - a.y
+  const len2 = dx * dx + dy * dy
+  if (len2 === 0) return { x: a.x, y: a.y }
+  const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2))
+  return { x: a.x + t * dx, y: a.y + t * dy }
+}
+
 /**
- * Returns the snapped µm point if the cursor is within SNAP_THRESHOLD_PX of a
- * grid crossing, otherwise returns the raw µm position.
- * Also returns whether snapping is active so the caller can show the indicator.
+ * Returns the best snapped µm point for the cursor position.
+ * Priority: shape features (vertices, grid×edge cross-sections, closest-on-edge)
+ * > grid intersections.  Also returns whether snapping is active and which kind.
  */
 function resolveSnap(
   pos: { x: number; y: number },
   vp: Viewport,
-): { um: Point; snapping: boolean } {
+  shape?: SampleShape | null,
+): { um: Point; snapping: boolean; snapKind: 'grid' | 'shape' } {
   const raw = pointerToUm(pos.x, pos.y, vp)
   const spacing = calcGridSpacing(vp)
-  const snapped = snapToGrid(raw, spacing)
-  const distPx = Math.hypot(
-    umToPixel(snapped.x, vp.left, vp.scale) - pos.x,
-    umToPixel(snapped.y, vp.top, vp.scale) - pos.y,
+
+  // ── Grid candidate ──────────────────────────────────────────────────────────
+  const gridSnapped = snapToGrid(raw, spacing)
+  const gridDistPx = Math.hypot(
+    umToPixel(gridSnapped.x, vp.left, vp.scale) - pos.x,
+    umToPixel(gridSnapped.y, vp.top, vp.scale) - pos.y,
   )
-  return distPx < SNAP_THRESHOLD_PX
-    ? { um: snapped, snapping: true }
-    : { um: raw, snapping: false }
+
+  const edges = getShapeEdges(shape)
+
+  if (edges.length === 0) {
+    return gridDistPx < SNAP_THRESHOLD_PX
+      ? { um: gridSnapped, snapping: true, snapKind: 'grid' }
+      : { um: raw, snapping: false, snapKind: 'grid' }
+  }
+
+  // ── Shape candidates ────────────────────────────────────────────────────────
+  const shapeCandidates: Point[] = []
+
+  // 1. Shape vertices (start of each edge = all vertices)
+  for (const [a] of edges) shapeCandidates.push(a)
+
+  // 2. Closest point on each edge to cursor
+  for (const [a, b] of edges) {
+    shapeCandidates.push(closestPointOnSegment(raw, a, b))
+  }
+
+  // 3. Grid-line × edge cross-section intersections
+  const colN = Math.round(raw.x / spacing)
+  for (let n = colN - 1; n <= colN + 1; n++) {
+    const gx = n * spacing
+    for (const [a, b] of edges) {
+      const dxAB = b.x - a.x
+      if (Math.abs(dxAB) < 1e-12) continue // edge is vertical — no unique solution
+      const t = (gx - a.x) / dxAB
+      if (t < 0 || t > 1) continue
+      shapeCandidates.push({ x: gx, y: a.y + t * (b.y - a.y) })
+    }
+  }
+  const rowN = Math.round(raw.y / spacing)
+  for (let n = rowN - 1; n <= rowN + 1; n++) {
+    const gy = n * spacing
+    for (const [a, b] of edges) {
+      const dyAB = b.y - a.y
+      if (Math.abs(dyAB) < 1e-12) continue // edge is horizontal — no unique solution
+      const t = (gy - a.y) / dyAB
+      if (t < 0 || t > 1) continue
+      shapeCandidates.push({ x: a.x + t * (b.x - a.x), y: gy })
+    }
+  }
+
+  // Best shape candidate (closest to cursor)
+  let bestShapePt: Point | null = null
+  let bestShapeDist = Infinity
+  for (const pt of shapeCandidates) {
+    const d = Math.hypot(
+      umToPixel(pt.x, vp.left, vp.scale) - pos.x,
+      umToPixel(pt.y, vp.top, vp.scale) - pos.y,
+    )
+    if (d < bestShapeDist) { bestShapeDist = d; bestShapePt = pt }
+  }
+
+  // ── Pick winner ─────────────────────────────────────────────────────────────
+  const shapeWins = bestShapePt !== null && bestShapeDist < SNAP_THRESHOLD_PX
+  const gridWins  = gridDistPx < SNAP_THRESHOLD_PX
+
+  if (shapeWins && gridWins) {
+    // Prefer shape when it's no more than 4 px farther than the grid
+    return bestShapeDist <= gridDistPx + 4
+      ? { um: bestShapePt!, snapping: true, snapKind: 'shape' }
+      : { um: gridSnapped,  snapping: true, snapKind: 'grid'  }
+  }
+  if (shapeWins) return { um: bestShapePt!, snapping: true, snapKind: 'shape' }
+  if (gridWins)  return { um: gridSnapped,  snapping: true, snapKind: 'grid'  }
+  return { um: raw, snapping: false, snapKind: 'grid' }
 }
 
 function CoordGrid({ vp, width, height, darkMode }: { vp: Viewport; width: number; height: number; darkMode: boolean }) {
@@ -996,7 +1093,7 @@ export default function SampleCanvas({
     cx: number; cy: number; r: number
   } | null>(null)
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null)
-  const [snapPoint, setSnapPoint] = useState<Point | null>(null)
+  const [snapPoint, setSnapPoint] = useState<{ um: Point; kind: 'grid' | 'shape' } | null>(null)
 
   // Refs for touch gesture tracking (refs = no stale-closure issues in touch handlers)
   const stageRef = useRef<Konva.Stage>(null)
@@ -1175,7 +1272,7 @@ export default function SampleCanvas({
         setPanState({ startX: pos.x, startY: pos.y, vpLeft: vp.left, vpTop: vp.top })
         return
       }
-      const { um } = resolveSnap(pos, vp)
+      const { um } = resolveSnap(pos, vp, shape)
       if (drawMode === 'rectangle') {
         setDrawState({ mode: 'drawing_rect', startX: um.x, startY: um.y })
         setPreviewRect({ x: um.x, y: um.y, w: 0, h: 0 })
@@ -1268,9 +1365,9 @@ export default function SampleCanvas({
         return
       }
       const isDrawMode = drawMode !== 'select'
-      const { um, snapping } = isDrawMode ? resolveSnap(pos, vp) : { um: pointerToUm(pos.x, pos.y, vp), snapping: false }
+      const { um, snapping, snapKind } = isDrawMode ? resolveSnap(pos, vp, shape) : { um: pointerToUm(pos.x, pos.y, vp), snapping: false, snapKind: 'grid' as const }
       const snapped = um
-      setSnapPoint(snapping ? snapped : null)
+      setSnapPoint(snapping ? { um: snapped, kind: snapKind } : null)
 
       // ── Rotated tile hover detection ───────────────────────────────────────
       // For rotated tiles we bypass Konva hit rects (skipHoverEvents=true) and
@@ -1470,7 +1567,7 @@ export default function SampleCanvas({
         setPanState(null)
         return
       }
-      const { um } = resolveSnap(pos, vp)
+      const { um } = resolveSnap(pos, vp, shape)
       if (drawState.mode === 'drawing_rect') {
         const w = Math.abs(um.x - drawState.startX)
         const h = Math.abs(um.y - drawState.startY)
@@ -1920,30 +2017,35 @@ export default function SampleCanvas({
           )}
           <DrawingPreview drawState={drawState} vp={vp} />
 
-          {/* Snap-to-grid indicator */}
-          {snapPoint && (
-            <>
-              <Line
-                points={[toX(snapPoint.x) - 12, toY(snapPoint.y), toX(snapPoint.x) + 12, toY(snapPoint.y)]}
-                stroke="#2563eb"
-                strokeWidth={0.75}
-                listening={false}
-              />
-              <Line
-                points={[toX(snapPoint.x), toY(snapPoint.y) - 12, toX(snapPoint.x), toY(snapPoint.y) + 12]}
-                stroke="#2563eb"
-                strokeWidth={0.75}
-                listening={false}
-              />
-              <Circle
-                x={toX(snapPoint.x)}
-                y={toY(snapPoint.y)}
-                radius={3}
-                fill="#2563eb"
-                listening={false}
-              />
-            </>
-          )}
+          {/* Snap indicator — blue for grid, orange for shape feature */}
+          {snapPoint && (() => {
+            const sx = toX(snapPoint.um.x)
+            const sy = toY(snapPoint.um.y)
+            const color = snapPoint.kind === 'shape' ? '#f59e0b' : '#2563eb'
+            return (
+              <>
+                <Line
+                  points={[sx - 12, sy, sx + 12, sy]}
+                  stroke={color}
+                  strokeWidth={0.75}
+                  listening={false}
+                />
+                <Line
+                  points={[sx, sy - 12, sx, sy + 12]}
+                  stroke={color}
+                  strokeWidth={0.75}
+                  listening={false}
+                />
+                <Circle
+                  x={sx}
+                  y={sy}
+                  radius={3}
+                  fill={color}
+                  listening={false}
+                />
+              </>
+            )
+          })()}
         </Layer>
       </Stage>
 
