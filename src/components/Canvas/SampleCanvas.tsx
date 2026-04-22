@@ -779,6 +779,75 @@ function FrameRenderer({
     const r = shape.rect
     const x0 = toX(r.x), y0 = toY(r.y)
     const W = px(r.width), H = px(r.height)
+
+    const getSegW = (side: string) => {
+      const seg = segments.find((s) => s.side === side)
+      return seg ? px(seg.widthUm) : 0
+    }
+    const getSegColor = (side: string) => {
+      const idx = segments.findIndex((s) => s.side === side)
+      return idx >= 0 ? FRAME_COLORS[idx % FRAME_COLORS.length] : '#888'
+    }
+    const wTop = getSegW('top'), wRight = getSegW('right')
+    const wBottom = getSegW('bottom'), wLeft = getSegW('left')
+
+    // Cubic Bézier corner bridge — same formula as freeform polygon corners.
+    // A and B are the outer endpoints of the two adjacent strips at the vertex.
+    // exIn/exOut are unit directions of the incoming/outgoing edges at that vertex.
+    const makeCorner = (
+      vx: number, vy: number,
+      ax: number, ay: number, bx: number, by: number,
+      exInX: number, exInY: number, exOutX: number, exOutY: number,
+      colorIn: string, colorOut: string,
+      wIn: number, wOut: number,
+      key: string,
+    ) => {
+      if (Math.max(wIn, wOut) < 0.5) return null
+      const abDist = Math.sqrt((bx - ax) ** 2 + (by - ay) ** 2)
+      if (abDist < 0.5) return null
+      const tension = 0.4 * abDist
+      const c1x = ax + exInX * tension,  c1y = ay + exInY * tension
+      const c2x = bx - exOutX * tension, c2y = by - exOutY * tension
+      // De Casteljau split at t = 0.5
+      const m1x = (ax + c1x) / 2,  m1y = (ay + c1y) / 2
+      const m2x = (c1x + c2x) / 2, m2y = (c1y + c2y) / 2
+      const m3x = (c2x + bx) / 2,  m3y = (c2y + by) / 2
+      const m4x = (m1x + m2x) / 2, m4y = (m1y + m2y) / 2
+      const m5x = (m2x + m3x) / 2, m5y = (m2y + m3y) / 2
+      const midx = (m4x + m5x) / 2, midy = (m4y + m5y) / 2
+      return (
+        <React.Fragment key={key}>
+          <Path data={`M ${vx} ${vy} L ${ax} ${ay} C ${m1x} ${m1y} ${m4x} ${m4y} ${midx} ${midy} Z`}
+            fill={colorIn} opacity={0.25} listening={false} />
+          <Path data={`M ${vx} ${vy} L ${midx} ${midy} C ${m5x} ${m5y} ${m3x} ${m3y} ${bx} ${by} Z`}
+            fill={colorOut} opacity={0.25} listening={false} />
+        </React.Fragment>
+      )
+    }
+
+    const corners = [
+      // TL — incoming: left (goes up), outgoing: top (goes right)
+      makeCorner(x0, y0,
+        x0 - wLeft, y0, x0, y0 - wTop,
+        0, -1, 1, 0,
+        getSegColor('left'), getSegColor('top'), wLeft, wTop, 'corner-tl'),
+      // TR — incoming: top (goes right), outgoing: right (goes down)
+      makeCorner(x0 + W, y0,
+        x0 + W, y0 - wTop, x0 + W + wRight, y0,
+        1, 0, 0, 1,
+        getSegColor('top'), getSegColor('right'), wTop, wRight, 'corner-tr'),
+      // BR — incoming: right (goes down), outgoing: bottom (goes left)
+      makeCorner(x0 + W, y0 + H,
+        x0 + W + wRight, y0 + H, x0 + W, y0 + H + wBottom,
+        0, 1, -1, 0,
+        getSegColor('right'), getSegColor('bottom'), wRight, wBottom, 'corner-br'),
+      // BL — incoming: bottom (goes left), outgoing: left (goes up)
+      makeCorner(x0, y0 + H,
+        x0, y0 + H + wBottom, x0 - wLeft, y0 + H,
+        -1, 0, 0, -1,
+        getSegColor('bottom'), getSegColor('left'), wBottom, wLeft, 'corner-bl'),
+    ]
+
     return (
       <Group listening={false}>
         {segments.map((seg, i) => {
@@ -794,11 +863,11 @@ function FrameRenderer({
           return (
             <React.Fragment key={seg.id}>
               <Rect x={rx} y={ry} width={rw} height={rh} fill={color} opacity={0.25} listening={false} />
-              <Rect x={rx} y={ry} width={rw} height={rh} stroke={color} strokeWidth={1} opacity={0.7} listening={false} />
               <Text x={midX - 8} y={midY - 6} text={seg.label} fontSize={10} fontStyle="bold" fill={color} listening={false} />
             </React.Fragment>
           )
         })}
+        {corners}
       </Group>
     )
   }
