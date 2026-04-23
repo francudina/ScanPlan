@@ -111,20 +111,26 @@ function generatePass(
   effStepY: number,
   shape: SampleShape,
   exclusionZones?: Point[][],
+  gridOrigin?: { x: number; y: number },
 ): ScanPass {
   const [xMin, yMin, xMax, yMax] = region
 
-  let nx = Math.max(1, Math.floor((xMax - xMin) / effStepX) + 1)
-  let ny = Math.max(1, Math.floor((yMax - yMin) / effStepY) + 1)
+  // When a global grid origin is provided (e.g. for centred circles), snap the
+  // starting position to the first grid line that falls within this region.
+  const ox = gridOrigin ? gridOrigin.x + Math.ceil((xMin - gridOrigin.x) / effStepX) * effStepX : xMin
+  const oy = gridOrigin ? gridOrigin.y + Math.ceil((yMin - gridOrigin.y) / effStepY) * effStepY : yMin
 
-  if (nx > 1 && xMin + (nx - 1) * effStepX > xMax + 1e-9) nx--
-  if (ny > 1 && yMin + (ny - 1) * effStepY > yMax + 1e-9) ny--
+  let nx = Math.max(1, Math.floor((xMax - ox) / effStepX) + 1)
+  let ny = Math.max(1, Math.floor((yMax - oy) / effStepY) + 1)
+
+  if (nx > 1 && ox + (nx - 1) * effStepX > xMax + 1e-9) nx--
+  if (ny > 1 && oy + (ny - 1) * effStepY > yMax + 1e-9) ny--
 
   const gridPoints: { x: number; y: number }[] = []
   for (let j = 0; j < ny; j++) {
     for (let i = 0; i < nx; i++) {
-      const px = xMin + i * effStepX
-      const py = yMin + j * effStepY
+      const px = ox + i * effStepX
+      const py = oy + j * effStepY
       if (pointInShape(px, py, shape, exclusionZones)) {
         gridPoints.push({ x: Math.round(px * 1e4) / 1e4, y: Math.round(py * 1e4) / 1e4 })
       }
@@ -143,7 +149,7 @@ function generatePass(
       x_max: Math.round(xMax * 1e4) / 1e4,
       y_max: Math.round(yMax * 1e4) / 1e4,
     },
-    start_point: { x: Math.round(xMin * 1e4) / 1e4, y: Math.round(yMin * 1e4) / 1e4 },
+    start_point: { x: Math.round(ox * 1e4) / 1e4, y: Math.round(oy * 1e4) / 1e4 },
     delta_x: Math.round(effStepX * 1e4) / 1e4,
     delta_y: Math.round(effStepY * 1e4) / 1e4,
     nx,
@@ -330,6 +336,24 @@ export function generateScanGrid(
   const effectiveShape = insetShape(shape, innerOffsetUm)
   // Clip each tile region to the inset shape's bbox so the grid starts exactly at the offset boundary
   const effectiveBounds = innerOffsetUm > 0 ? getBoundingBox(effectiveShape) : null
+
+  // For circles, centre the grid on the circle origin so that slack space is
+  // distributed equally on all sides (odd count: a point sits on the centre;
+  // even count: the four centre cells share their common corner at the origin).
+  let gridOrigin: { x: number; y: number } | undefined
+  if (effectiveShape.type === 'circle' && effectiveShape.circle) {
+    const c = effectiveShape.circle
+    const bb = getBoundingBox(effectiveShape)
+    let nx = Math.max(1, Math.floor((bb[2] - bb[0]) / effStepX) + 1)
+    let ny = Math.max(1, Math.floor((bb[3] - bb[1]) / effStepY) + 1)
+    if (nx > 1 && bb[0] + (nx - 1) * effStepX > bb[2] + 1e-9) nx--
+    if (ny > 1 && bb[1] + (ny - 1) * effStepY > bb[3] + 1e-9) ny--
+    gridOrigin = {
+      x: c.cx - (nx - 1) * effStepX / 2,
+      y: c.cy - (ny - 1) * effStepY / 2,
+    }
+  }
+
   const rawPasses: ScanPass[] = regions.map((region, i) => {
     const r: [number, number, number, number] = effectiveBounds
       ? [
@@ -339,7 +363,7 @@ export function generateScanGrid(
           Math.min(region[3], effectiveBounds[3]),
         ]
       : region
-    return generatePass(i + 1, r, effStepX, effStepY, effectiveShape, exZonePts)
+    return generatePass(i + 1, r, effStepX, effStepY, effectiveShape, exZonePts, gridOrigin)
   })
 
   // Deduplicate: remove points already claimed by an earlier tile

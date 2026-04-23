@@ -950,13 +950,23 @@ function FrameRenderer({
     const pts = shape.freeform.points
     const n = pts.length
 
+    // Detect winding order in screen space (y-down). Shoelace formula:
+    // CCW screen polygon → screenArea < 0, left-hand normal points outward ✓
+    // CW  screen polygon → screenArea > 0, left-hand normal points inward  ✗ → flip
+    let screenArea = 0
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n
+      screenArea += toX(pts[i].x) * toY(pts[j].y) - toX(pts[j].x) * toY(pts[i].y)
+    }
+    const windingSign = screenArea < 0 ? 1 : -1
+
     // Pre-compute each edge's outward normal (pixel space, unit length)
     const edgeNormals: { nx: number; ny: number }[] = pts.map((p0, i) => {
       const p1 = pts[(i + 1) % n]
       const dx = toX(p1.x) - toX(p0.x), dy = toY(p1.y) - toY(p0.y)
       const len = Math.sqrt(dx * dx + dy * dy)
       if (len < 0.01) return { nx: 0, ny: 0 }
-      return { nx: -dy / len, ny: dx / len }
+      return { nx: (-dy / len) * windingSign, ny: (dx / len) * windingSign }
     })
 
     const strips = segments.map((seg, i) => {
@@ -1008,8 +1018,8 @@ function FrameRenderer({
       const lenOut = Math.sqrt(dxOut * dxOut + dyOut * dyOut)
       if (lenIn < 1 || lenOut < 1) return null
 
-      const nxIn  = -dyIn  / lenIn,  nyIn  = dxIn  / lenIn
-      const nxOut = -dyOut / lenOut, nyOut = dxOut / lenOut
+      const nxIn  = (-dyIn  / lenIn)  * windingSign, nyIn  = (dxIn  / lenIn)  * windingSign
+      const nxOut = (-dyOut / lenOut) * windingSign, nyOut = (dxOut / lenOut) * windingSign
 
       // A and B: the exact outer corners the curve must connect
       const ax = p1x + nxIn  * wIn,  ay = p1y + nyIn  * wIn
